@@ -508,3 +508,179 @@ export async function getAdminActivityLogs(
 
   return { logs: (data as PlatformAdminLog[]) || [], total: count || 0 };
 }
+
+// --- Benchmarks ---
+
+export type BenchmarkQuestionData = {
+  id?: string;
+  code: string;
+  text_fr: string;
+  text_en: string;
+  market_average: number;
+  sort_order: number;
+};
+
+export type BenchmarkThemeData = {
+  id: string;
+  code: string;
+  label_fr: string;
+  label_en: string;
+  market_average: number;
+  by_industry: Record<string, number>;
+  by_company_size: Record<string, number>;
+  sort_order: number;
+  updated_at: string;
+  benchmark_questions: BenchmarkQuestionData[];
+};
+
+export async function getBenchmarkThemes(): Promise<BenchmarkThemeData[]> {
+  await verifyPlatformAdmin();
+  const admin = createAdminClient();
+
+  const { data } = await admin
+    .from("benchmark_themes")
+    .select("*, benchmark_questions(*)")
+    .order("sort_order");
+
+  return (data as BenchmarkThemeData[]) || [];
+}
+
+export async function saveBenchmarkTheme(theme: {
+  id?: string;
+  code: string;
+  label_fr: string;
+  label_en: string;
+  market_average: number;
+  by_industry: Record<string, number>;
+  by_company_size: Record<string, number>;
+  sort_order?: number;
+  questions?: { code: string; text_fr: string; text_en: string; market_average: number }[];
+}): Promise<{ id?: string; error?: string }> {
+  const adminUserId = await verifyPlatformAdmin();
+  const admin = createAdminClient();
+
+  let themeId = theme.id;
+
+  if (themeId) {
+    const { error } = await admin
+      .from("benchmark_themes")
+      .update({
+        code: theme.code,
+        label_fr: theme.label_fr,
+        label_en: theme.label_en,
+        market_average: theme.market_average,
+        by_industry: theme.by_industry,
+        by_company_size: theme.by_company_size,
+        sort_order: theme.sort_order || 0,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", themeId);
+
+    if (error) return { error: error.message };
+  } else {
+    const { data: inserted, error } = await admin
+      .from("benchmark_themes")
+      .insert({
+        code: theme.code,
+        label_fr: theme.label_fr,
+        label_en: theme.label_en,
+        market_average: theme.market_average,
+        by_industry: theme.by_industry,
+        by_company_size: theme.by_company_size,
+        sort_order: theme.sort_order || 0,
+      })
+      .select("id")
+      .single();
+
+    if (error) return { error: error.message };
+    themeId = inserted.id;
+  }
+
+  // Upsert questions
+  if (theme.questions) {
+    await admin.from("benchmark_questions").delete().eq("theme_id", themeId!);
+
+    if (theme.questions.length > 0) {
+      const { error: qError } = await admin.from("benchmark_questions").insert(
+        theme.questions.map((q, i) => ({
+          theme_id: themeId!,
+          code: q.code,
+          text_fr: q.text_fr,
+          text_en: q.text_en,
+          market_average: q.market_average,
+          sort_order: i,
+        }))
+      );
+      if (qError) return { error: qError.message };
+    }
+  }
+
+  await logAdminAction(adminUserId, theme.id ? "update_benchmark" : "create_benchmark", "benchmark_theme", themeId!);
+  return { id: themeId };
+}
+
+export async function deleteBenchmarkTheme(id: string): Promise<{ error?: string }> {
+  const adminUserId = await verifyPlatformAdmin();
+  const admin = createAdminClient();
+
+  await admin.from("benchmark_questions").delete().eq("theme_id", id);
+  const { error } = await admin.from("benchmark_themes").delete().eq("id", id);
+
+  if (error) return { error: error.message };
+
+  await logAdminAction(adminUserId, "delete_benchmark", "benchmark_theme", id);
+  return {};
+}
+
+export async function seedBenchmarkThemes(): Promise<{ count?: number; error?: string }> {
+  const adminUserId = await verifyPlatformAdmin();
+  const admin = createAdminClient();
+
+  // Check if data already exists
+  const { count } = await admin
+    .from("benchmark_themes")
+    .select("id", { count: "exact", head: true });
+
+  if (count && count > 0) {
+    return { error: "Des benchmarks existent déjà. Supprimez-les d'abord pour réimporter." };
+  }
+
+  // Dynamic import of template data
+  const { default: benchmarkTemplate } = await import("@/lib/benchmarks-template.json");
+
+  for (let i = 0; i < benchmarkTemplate.themes.length; i++) {
+    const theme = benchmarkTemplate.themes[i];
+
+    const { data: inserted, error: themeError } = await admin
+      .from("benchmark_themes")
+      .insert({
+        code: theme.code,
+        label_fr: theme.label_fr,
+        label_en: theme.label_en,
+        market_average: theme.market_average,
+        by_industry: theme.by_industry,
+        by_company_size: theme.by_company_size,
+        sort_order: i,
+      })
+      .select("id")
+      .single();
+
+    if (themeError || !inserted) continue;
+
+    if (theme.questions.length > 0) {
+      await admin.from("benchmark_questions").insert(
+        theme.questions.map((q, j) => ({
+          theme_id: inserted.id,
+          code: q.code,
+          text_fr: q.text_fr,
+          text_en: q.text_en,
+          market_average: q.market_average,
+          sort_order: j,
+        }))
+      );
+    }
+  }
+
+  await logAdminAction(adminUserId, "seed_benchmarks", "benchmark_theme", "all");
+  return { count: benchmarkTemplate.themes.length };
+}

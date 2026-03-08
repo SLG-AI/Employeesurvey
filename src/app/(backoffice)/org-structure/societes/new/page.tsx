@@ -19,8 +19,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Building2, Loader2, ImagePlus } from "lucide-react";
+import { Building2, Loader2, ImagePlus, Factory } from "lucide-react";
 import { toast } from "sonner";
+import { INDUSTRIES } from "@/lib/industries";
+import { COMPANY_SIZES } from "@/lib/company-sizes";
 
 const GOOGLE_FONTS = [
   "Inter",
@@ -64,6 +66,8 @@ export default function NewSocietePage() {
   const [secondaryColor, setSecondaryColor] = useState("#16213e");
   const [accentColor, setAccentColor] = useState("#0f3460");
   const [fontFamily, setFontFamily] = useState("Inter");
+  const [industryCode, setIndustryCode] = useState("");
+  const [companySize, setCompanySize] = useState("");
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [loadedFonts, setLoadedFonts] = useState<Set<string>>(new Set(["Inter"]));
@@ -106,6 +110,8 @@ export default function NewSocietePage() {
     formData.append("secondary_color", secondaryColor);
     formData.append("accent_color", accentColor);
     if (fontFamily) formData.append("font_family", fontFamily);
+    if (industryCode) formData.append("industry_code", industryCode);
+    if (companySize) formData.append("company_size", companySize);
     if (logoFile) formData.append("logo", logoFile);
 
     const res = await fetch("/api/org-structure/societe", {
@@ -186,6 +192,57 @@ export default function NewSocietePage() {
                 </label>
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Type d'industrie */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Factory className="h-5 w-5" />
+              Type d&apos;industrie
+            </CardTitle>
+            <CardDescription>
+              Secteur d&apos;activité de la société
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Select value={industryCode} onValueChange={setIndustryCode}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Sélectionner un secteur" />
+              </SelectTrigger>
+              <SelectContent>
+                {INDUSTRIES.map((ind) => (
+                  <SelectItem key={ind.code} value={ind.code}>
+                    {ind.label_fr}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </CardContent>
+        </Card>
+
+        {/* Taille */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Building2 className="h-5 w-5" />
+              Taille de l&apos;entreprise
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Select value={companySize} onValueChange={setCompanySize}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Sélectionner une taille" />
+              </SelectTrigger>
+              <SelectContent>
+                {COMPANY_SIZES.map((s) => (
+                  <SelectItem key={s.code} value={s.code}>
+                    {s.label_fr}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </CardContent>
         </Card>
 

@@ -28,11 +28,11 @@ import { Badge } from "@/components/ui/badge";
 import { useTenant } from "@/hooks/use-tenant";
 
 const navigationItems = [
-  {
-    title: "Tableau de bord",
-    href: "/dashboard",
-    icon: LayoutDashboard,
-  },
+  // {
+  //   title: "Tableau de bord",
+  //   href: "/dashboard",
+  //   icon: LayoutDashboard,
+  // },
   {
     title: "Sondages",
     href: "/surveys",
@@ -85,7 +85,7 @@ export function AppSidebar() {
   return (
     <Sidebar>
       <SidebarHeader className="border-b px-6 py-4">
-        <Link href="/dashboard" className="flex items-center gap-2">
+        <Link href="/surveys" className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <ClipboardList className="h-4 w-4" />
           </div>

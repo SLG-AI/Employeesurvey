@@ -19,13 +19,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Pencil, Trash2, Eye, BarChart3, Copy } from "lucide-react";
+import { Plus, Pencil, Trash2, Eye, BarChart3, Copy, Clock, CheckCircle2 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import Link from "next/link";
 import type { Survey } from "@/lib/types";
 
 type SurveyWithSociete = Survey & {
   societe: { id: string; name: string } | null;
+};
+
+type CompletionData = {
+  totalTokens: number;
+  totalResponses: number;
+  rate: number;
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -46,6 +59,7 @@ export default function SurveysPage() {
   const [societes, setSocietes] = useState<{ id: string; name: string }[]>([]);
   const [filterSociete, setFilterSociete] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [completionMap, setCompletionMap] = useState<Record<string, CompletionData>>({});
   const supabase = createClient();
 
   const loadSurveys = useCallback(async () => {
@@ -66,6 +80,28 @@ export default function SurveysPage() {
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       });
       setSurveys(sorted);
+
+      // Load completion data for published surveys
+      const publishedIds = sorted.filter((s) => s.status === "published").map((s) => s.id);
+      if (publishedIds.length > 0) {
+        const map: Record<string, CompletionData> = {};
+        await Promise.all(
+          publishedIds.map(async (id) => {
+            const [tokensRes, responsesRes] = await Promise.all([
+              supabase.from("survey_tokens").select("id", { count: "exact", head: true }).eq("survey_id", id),
+              supabase.from("responses").select("id", { count: "exact", head: true }).eq("survey_id", id),
+            ]);
+            const totalTokens = tokensRes.count ?? 0;
+            const totalResponses = responsesRes.count ?? 0;
+            map[id] = {
+              totalTokens,
+              totalResponses,
+              rate: totalTokens > 0 ? Math.round((totalResponses / totalTokens) * 100) : 0,
+            };
+          })
+        );
+        setCompletionMap(map);
+      }
     }
     setLoading(false);
   }, [supabase]);
@@ -246,19 +282,21 @@ export default function SurveysPage() {
               <TableHead>Statut</TableHead>
               <TableHead>Créé le</TableHead>
               <TableHead>Publié le</TableHead>
+              <TableHead>Clôture</TableHead>
+              <TableHead>Taux de réponse</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8">
+                <TableCell colSpan={8} className="text-center py-8">
                   Chargement...
                 </TableCell>
               </TableRow>
             ) : filteredSurveys.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                   Aucun sondage. Créez votre premier sondage.
                 </TableCell>
               </TableRow>
@@ -287,6 +325,53 @@ export default function SurveysPage() {
                     {survey.published_at
                       ? new Date(survey.published_at).toLocaleDateString("fr-FR")
                       : "—"}
+                  </TableCell>
+                  <TableCell>
+                    {survey.status === "published" && survey.closes_at ? (
+                      (() => {
+                        const daysLeft = Math.ceil(
+                          (new Date(survey.closes_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+                        );
+                        return (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className={`inline-flex items-center gap-1 text-sm ${daysLeft <= 3 ? "text-destructive font-medium" : daysLeft <= 7 ? "text-amber-600" : "text-muted-foreground"}`}>
+                                  <Clock className="h-3.5 w-3.5" />
+                                  {daysLeft <= 0 ? "Expiré" : `${daysLeft}j`}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                Clôture le {new Date(survey.closes_at).toLocaleDateString("fr-FR")}
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        );
+                      })()
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {survey.status === "published" && completionMap[survey.id] ? (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="flex items-center gap-2 min-w-[120px]">
+                              <Progress value={completionMap[survey.id].rate} className="h-2 w-16" />
+                              <span className="text-sm text-muted-foreground whitespace-nowrap">
+                                {completionMap[survey.id].rate}%
+                              </span>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {completionMap[survey.id].totalResponses} / {completionMap[survey.id].totalTokens} réponses
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">

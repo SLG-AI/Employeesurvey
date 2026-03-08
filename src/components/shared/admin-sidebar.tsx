@@ -5,6 +5,7 @@ import {
   Building2,
   Users,
   ScrollText,
+  BarChart3,
   LogOut,
   ArrowLeft,
 } from "lucide-react";
@@ -40,6 +41,11 @@ const navigationItems = [
     title: "Utilisateurs",
     href: "/admin/users",
     icon: Users,
+  },
+  {
+    title: "Benchmarks",
+    href: "/admin/benchmarks",
+    icon: BarChart3,
   },
   {
     title: "Logs d'audit",

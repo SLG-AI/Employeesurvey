@@ -20,6 +20,8 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { BenchmarkTab } from "@/components/shared/benchmark-tab";
 import { ArrowLeft, Users, ShieldAlert, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -205,6 +207,14 @@ export default function ResultsPage() {
           {data?.totalResponses || 0} réponse(s)
         </Badge>
       </div>
+
+      <Tabs defaultValue="results" className="w-full">
+        <TabsList>
+          <TabsTrigger value="results">Résultats</TabsTrigger>
+          <TabsTrigger value="benchmarks">Benchmarks</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="results" className="space-y-6 mt-4">
 
       {/* Open mode text-based org filters */}
       {data?.survey?.distribution_mode === "open" && (
@@ -706,6 +716,13 @@ export default function ResultsPage() {
             </CardContent>
           </Card>
         )}
+
+        </TabsContent>
+
+        <TabsContent value="benchmarks" className="mt-4">
+          <BenchmarkTab surveyId={surveyId} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

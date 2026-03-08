@@ -268,14 +268,11 @@ export default function DashboardPage() {
     )
       return;
 
-    const { error } = await supabase
-      .from("surveys")
-      .update({ status: "closed", closed_at: new Date().toISOString() })
-      .eq("id", survey.id);
-
-    if (error) {
+    const res = await fetch(`/api/surveys/${survey.id}/close`, { method: "POST" });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
       toast.error("Erreur lors de la clôture", {
-        description: error.message,
+        description: data.error || "Erreur inconnue",
       });
     } else {
       toast.success("Sondage clôturé");

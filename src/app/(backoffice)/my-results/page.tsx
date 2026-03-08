@@ -29,11 +29,11 @@ export default function MyResultsPage() {
   const loadSurveys = useCallback(async () => {
     setLoading(true);
 
-    // Load published and closed surveys
+    // Load only closed surveys (no partial results)
     const { data } = await supabase
       .from("surveys")
       .select("id, title_fr, status, published_at")
-      .in("status", ["published", "closed"])
+      .eq("status", "closed")
       .order("published_at", { ascending: false });
 
     setSurveys(data || []);

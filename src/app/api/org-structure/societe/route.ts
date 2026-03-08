@@ -31,6 +31,8 @@ export async function POST(request: Request) {
   const secondaryColor = formData.get("secondary_color") as string | null;
   const accentColor = formData.get("accent_color") as string | null;
   const fontFamily = formData.get("font_family") as string | null;
+  const industryCode = formData.get("industry_code") as string | null;
+  const companySize = formData.get("company_size") as string | null;
   const logoFile = formData.get("logo") as File | null;
 
   if (!name) {
@@ -93,6 +95,8 @@ export async function POST(request: Request) {
       secondary_color: secondaryColor || null,
       accent_color: accentColor || null,
       font_family: fontFamily || null,
+      industry_code: industryCode || null,
+      company_size: companySize || null,
     })
     .select("id")
     .single();
@@ -167,6 +171,8 @@ export async function PUT(request: Request) {
   const secondaryColor = formData.get("secondary_color") as string | null;
   const accentColor = formData.get("accent_color") as string | null;
   const fontFamily = formData.get("font_family") as string | null;
+  const industryCode = formData.get("industry_code") as string | null;
+  const companySize = formData.get("company_size") as string | null;
   const logoFile = formData.get("logo") as File | null;
 
   if (!id) {
@@ -218,6 +224,8 @@ export async function PUT(request: Request) {
       secondary_color: secondaryColor || null,
       accent_color: accentColor || null,
       font_family: fontFamily || null,
+      industry_code: industryCode || null,
+      company_size: companySize || null,
     })
     .eq("id", id);
 

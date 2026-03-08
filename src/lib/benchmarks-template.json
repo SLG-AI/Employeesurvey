@@ -1,0 +1,608 @@
+{
+  "version": "1.0",
+  "scale": "1-10",
+  "last_updated": "2026-03-08",
+  "sources": [
+    "Gallup State of the Global Workplace 2025",
+    "Great Place to Work Europe 2025",
+    "Willis Towers Watson Global Benefits 2025",
+    "Mercer Employee Engagement 2025"
+  ],
+  "themes": [
+    {
+      "code": "ENGAGEMENT",
+      "label_fr": "Engagement",
+      "label_en": "Engagement",
+      "market_average": 6.4,
+      "by_industry": {
+        "TECH": 7.0,
+        "FIN_INS_RE": 6.5,
+        "HEALTH_SOC": 6.8,
+        "MANU": 5.9,
+        "RETAIL": 5.7,
+        "PUB_NPO": 6.2,
+        "CONST": 5.8,
+        "EDU": 6.6,
+        "PRO_SERV": 6.9,
+        "HOSP_TOUR": 5.5,
+        "TRANS_LOG": 5.6,
+        "INFO_MEDIA_TEL": 6.8,
+        "AGRI": 5.7,
+        "MIN_ENE": 6.1,
+        "WHOLE": 5.8,
+        "ART_CULT_SPORT": 6.7,
+        "BIZ_FAC_ENV": 5.9,
+        "OTHER_SERV": 6.0
+      },
+      "by_company_size": {
+        "XS": 7.1,
+        "S": 6.7,
+        "M": 6.3,
+        "L": 6.1,
+        "XL": 5.9
+      },
+      "questions": [
+        {
+          "code": "ENG_01",
+          "text_fr": "Je suis fier(e) de travailler pour mon entreprise",
+          "text_en": "I am proud to work for my company",
+          "market_average": 6.8
+        },
+        {
+          "code": "ENG_02",
+          "text_fr": "Je recommanderais mon entreprise comme un bon endroit pour travailler",
+          "text_en": "I would recommend my company as a great place to work",
+          "market_average": 6.3
+        },
+        {
+          "code": "ENG_03",
+          "text_fr": "Je me sens motivé(e) pour donner le meilleur de moi-même",
+          "text_en": "I feel motivated to go above and beyond",
+          "market_average": 6.2
+        },
+        {
+          "code": "ENG_04",
+          "text_fr": "Je me vois encore dans cette entreprise dans 2 ans",
+          "text_en": "I see myself still working here in 2 years",
+          "market_average": 6.1
+        }
+      ]
+    },
+    {
+      "code": "MANAGEMENT",
+      "label_fr": "Management",
+      "label_en": "Management & Leadership",
+      "market_average": 6.1,
+      "by_industry": {
+        "TECH": 6.7,
+        "FIN_INS_RE": 6.2,
+        "HEALTH_SOC": 5.9,
+        "MANU": 5.6,
+        "RETAIL": 5.4,
+        "PUB_NPO": 5.8,
+        "CONST": 5.5,
+        "EDU": 6.1,
+        "PRO_SERV": 6.6,
+        "HOSP_TOUR": 5.3,
+        "TRANS_LOG": 5.4,
+        "INFO_MEDIA_TEL": 6.5,
+        "AGRI": 5.5,
+        "MIN_ENE": 5.8,
+        "WHOLE": 5.6,
+        "ART_CULT_SPORT": 6.2,
+        "BIZ_FAC_ENV": 5.7,
+        "OTHER_SERV": 5.8
+      },
+      "by_company_size": {
+        "XS": 7.0,
+        "S": 6.5,
+        "M": 6.0,
+        "L": 5.7,
+        "XL": 5.5
+      },
+      "questions": [
+        {
+          "code": "MGT_01",
+          "text_fr": "Mon manager me donne des retours réguliers et constructifs",
+          "text_en": "My manager gives me regular and constructive feedback",
+          "market_average": 5.8
+        },
+        {
+          "code": "MGT_02",
+          "text_fr": "Mon manager me fait confiance dans mon travail",
+          "text_en": "My manager trusts me in my work",
+          "market_average": 7.0
+        },
+        {
+          "code": "MGT_03",
+          "text_fr": "Mon manager est à l'écoute de mes préoccupations",
+          "text_en": "My manager listens to my concerns",
+          "market_average": 6.2
+        },
+        {
+          "code": "MGT_04",
+          "text_fr": "La direction communique une vision claire pour l'avenir",
+          "text_en": "Leadership communicates a clear vision for the future",
+          "market_average": 5.5
+        }
+      ]
+    },
+    {
+      "code": "COMMUNICATION",
+      "label_fr": "Communication interne",
+      "label_en": "Internal Communication",
+      "market_average": 5.7,
+      "by_industry": {
+        "TECH": 6.4,
+        "FIN_INS_RE": 5.8,
+        "HEALTH_SOC": 5.5,
+        "MANU": 5.2,
+        "RETAIL": 5.0,
+        "PUB_NPO": 5.4,
+        "CONST": 5.1,
+        "EDU": 5.7,
+        "PRO_SERV": 6.2,
+        "HOSP_TOUR": 4.9,
+        "TRANS_LOG": 5.0,
+        "INFO_MEDIA_TEL": 6.3,
+        "AGRI": 5.0,
+        "MIN_ENE": 5.4,
+        "WHOLE": 5.2,
+        "ART_CULT_SPORT": 5.9,
+        "BIZ_FAC_ENV": 5.3,
+        "OTHER_SERV": 5.4
+      },
+      "by_company_size": {
+        "XS": 6.8,
+        "S": 6.2,
+        "M": 5.6,
+        "L": 5.3,
+        "XL": 5.0
+      },
+      "questions": [
+        {
+          "code": "COM_01",
+          "text_fr": "Je suis bien informé(e) des décisions importantes",
+          "text_en": "I am well informed about important decisions",
+          "market_average": 5.5
+        },
+        {
+          "code": "COM_02",
+          "text_fr": "La communication entre les équipes est efficace",
+          "text_en": "Communication between teams is effective",
+          "market_average": 5.3
+        },
+        {
+          "code": "COM_03",
+          "text_fr": "Je peux exprimer librement mes idées et opinions",
+          "text_en": "I can freely express my ideas and opinions",
+          "market_average": 6.2
+        }
+      ]
+    },
+    {
+      "code": "WORK_CONDITIONS",
+      "label_fr": "Conditions de travail",
+      "label_en": "Work Conditions & Environment",
+      "market_average": 6.5,
+      "by_industry": {
+        "TECH": 7.3,
+        "FIN_INS_RE": 6.8,
+        "HEALTH_SOC": 5.8,
+        "MANU": 5.9,
+        "RETAIL": 5.5,
+        "PUB_NPO": 6.3,
+        "CONST": 5.6,
+        "EDU": 6.4,
+        "PRO_SERV": 7.0,
+        "HOSP_TOUR": 5.3,
+        "TRANS_LOG": 5.5,
+        "INFO_MEDIA_TEL": 7.1,
+        "AGRI": 5.4,
+        "MIN_ENE": 6.0,
+        "WHOLE": 5.8,
+        "ART_CULT_SPORT": 6.2,
+        "BIZ_FAC_ENV": 5.9,
+        "OTHER_SERV": 6.1
+      },
+      "by_company_size": {
+        "XS": 6.9,
+        "S": 6.7,
+        "M": 6.5,
+        "L": 6.3,
+        "XL": 6.2
+      },
+      "questions": [
+        {
+          "code": "WRK_01",
+          "text_fr": "Mon environnement de travail me permet d'être productif",
+          "text_en": "My work environment allows me to be productive",
+          "market_average": 6.5
+        },
+        {
+          "code": "WRK_02",
+          "text_fr": "J'ai les outils et ressources nécessaires pour bien faire mon travail",
+          "text_en": "I have the tools and resources to do my job well",
+          "market_average": 6.3
+        },
+        {
+          "code": "WRK_03",
+          "text_fr": "Ma charge de travail est raisonnable",
+          "text_en": "My workload is reasonable",
+          "market_average": 5.8
+        }
+      ]
+    },
+    {
+      "code": "DEVELOPMENT",
+      "label_fr": "Développement & Formation",
+      "label_en": "Development & Training",
+      "market_average": 5.6,
+      "by_industry": {
+        "TECH": 6.5,
+        "FIN_INS_RE": 5.9,
+        "HEALTH_SOC": 5.7,
+        "MANU": 5.1,
+        "RETAIL": 4.8,
+        "PUB_NPO": 5.4,
+        "CONST": 4.9,
+        "EDU": 6.0,
+        "PRO_SERV": 6.3,
+        "HOSP_TOUR": 4.7,
+        "TRANS_LOG": 4.8,
+        "INFO_MEDIA_TEL": 6.3,
+        "AGRI": 4.6,
+        "MIN_ENE": 5.3,
+        "WHOLE": 5.0,
+        "ART_CULT_SPORT": 5.8,
+        "BIZ_FAC_ENV": 5.1,
+        "OTHER_SERV": 5.2
+      },
+      "by_company_size": {
+        "XS": 5.2,
+        "S": 5.5,
+        "M": 5.7,
+        "L": 5.9,
+        "XL": 6.1
+      },
+      "questions": [
+        {
+          "code": "DEV_01",
+          "text_fr": "J'ai des opportunités de développement professionnel",
+          "text_en": "I have opportunities for professional development",
+          "market_average": 5.5
+        },
+        {
+          "code": "DEV_02",
+          "text_fr": "Mon entreprise investit dans ma formation",
+          "text_en": "My company invests in my training",
+          "market_average": 5.3
+        },
+        {
+          "code": "DEV_03",
+          "text_fr": "Je vois des possibilités d'évolution de carrière",
+          "text_en": "I see career advancement possibilities",
+          "market_average": 5.1
+        }
+      ]
+    },
+    {
+      "code": "COMPENSATION",
+      "label_fr": "Rémunération & Avantages",
+      "label_en": "Compensation & Benefits",
+      "market_average": 5.2,
+      "by_industry": {
+        "TECH": 6.3,
+        "FIN_INS_RE": 6.0,
+        "HEALTH_SOC": 4.8,
+        "MANU": 5.1,
+        "RETAIL": 4.5,
+        "PUB_NPO": 4.7,
+        "CONST": 5.2,
+        "EDU": 4.6,
+        "PRO_SERV": 5.8,
+        "HOSP_TOUR": 4.3,
+        "TRANS_LOG": 4.9,
+        "INFO_MEDIA_TEL": 6.0,
+        "AGRI": 4.5,
+        "MIN_ENE": 5.8,
+        "WHOLE": 5.0,
+        "ART_CULT_SPORT": 4.8,
+        "BIZ_FAC_ENV": 4.9,
+        "OTHER_SERV": 5.0
+      },
+      "by_company_size": {
+        "XS": 5.0,
+        "S": 5.1,
+        "M": 5.2,
+        "L": 5.4,
+        "XL": 5.6
+      },
+      "questions": [
+        {
+          "code": "CMP_01",
+          "text_fr": "Ma rémunération est juste par rapport à mon travail",
+          "text_en": "My compensation is fair for the work I do",
+          "market_average": 5.0
+        },
+        {
+          "code": "CMP_02",
+          "text_fr": "Les avantages sociaux proposés sont satisfaisants",
+          "text_en": "The benefits offered are satisfactory",
+          "market_average": 5.5
+        },
+        {
+          "code": "CMP_03",
+          "text_fr": "Ma rémunération est compétitive par rapport au marché",
+          "text_en": "My compensation is competitive with the market",
+          "market_average": 4.9
+        }
+      ]
+    },
+    {
+      "code": "WORK_LIFE_BALANCE",
+      "label_fr": "Équilibre vie pro / vie perso",
+      "label_en": "Work-Life Balance",
+      "market_average": 6.1,
+      "by_industry": {
+        "TECH": 6.6,
+        "FIN_INS_RE": 5.8,
+        "HEALTH_SOC": 5.4,
+        "MANU": 6.0,
+        "RETAIL": 5.3,
+        "PUB_NPO": 6.5,
+        "CONST": 5.7,
+        "EDU": 6.4,
+        "PRO_SERV": 5.9,
+        "HOSP_TOUR": 4.8,
+        "TRANS_LOG": 5.5,
+        "INFO_MEDIA_TEL": 6.4,
+        "AGRI": 5.6,
+        "MIN_ENE": 6.0,
+        "WHOLE": 5.8,
+        "ART_CULT_SPORT": 5.7,
+        "BIZ_FAC_ENV": 5.9,
+        "OTHER_SERV": 6.0
+      },
+      "by_company_size": {
+        "XS": 6.8,
+        "S": 6.4,
+        "M": 6.0,
+        "L": 5.8,
+        "XL": 5.6
+      },
+      "questions": [
+        {
+          "code": "WLB_01",
+          "text_fr": "Je parviens à maintenir un bon équilibre entre vie professionnelle et personnelle",
+          "text_en": "I am able to maintain a good work-life balance",
+          "market_average": 6.1
+        },
+        {
+          "code": "WLB_02",
+          "text_fr": "Mon entreprise respecte mon droit à la déconnexion",
+          "text_en": "My company respects my right to disconnect",
+          "market_average": 6.0
+        },
+        {
+          "code": "WLB_03",
+          "text_fr": "La flexibilité offerte (télétravail, horaires) me convient",
+          "text_en": "The flexibility offered (remote work, schedules) suits me",
+          "market_average": 6.3
+        }
+      ]
+    },
+    {
+      "code": "DIVERSITY_INCLUSION",
+      "label_fr": "Diversité & Inclusion",
+      "label_en": "Diversity & Inclusion",
+      "market_average": 6.3,
+      "by_industry": {
+        "TECH": 6.7,
+        "FIN_INS_RE": 6.5,
+        "HEALTH_SOC": 6.6,
+        "MANU": 5.8,
+        "RETAIL": 5.9,
+        "PUB_NPO": 6.7,
+        "CONST": 5.5,
+        "EDU": 6.8,
+        "PRO_SERV": 6.6,
+        "HOSP_TOUR": 5.8,
+        "TRANS_LOG": 5.6,
+        "INFO_MEDIA_TEL": 6.6,
+        "AGRI": 5.5,
+        "MIN_ENE": 5.9,
+        "WHOLE": 5.7,
+        "ART_CULT_SPORT": 6.8,
+        "BIZ_FAC_ENV": 5.9,
+        "OTHER_SERV": 6.0
+      },
+      "by_company_size": {
+        "XS": 6.5,
+        "S": 6.3,
+        "M": 6.2,
+        "L": 6.3,
+        "XL": 6.4
+      },
+      "questions": [
+        {
+          "code": "DIV_01",
+          "text_fr": "Mon entreprise valorise la diversité",
+          "text_en": "My company values diversity",
+          "market_average": 6.4
+        },
+        {
+          "code": "DIV_02",
+          "text_fr": "Je me sens respecté(e) quelles que soient mes différences",
+          "text_en": "I feel respected regardless of my differences",
+          "market_average": 6.8
+        },
+        {
+          "code": "DIV_03",
+          "text_fr": "Tout le monde a les mêmes chances de réussir ici",
+          "text_en": "Everyone has equal opportunities to succeed here",
+          "market_average": 5.7
+        }
+      ]
+    },
+    {
+      "code": "CULTURE",
+      "label_fr": "Culture d'entreprise",
+      "label_en": "Company Culture",
+      "market_average": 6.2,
+      "by_industry": {
+        "TECH": 6.9,
+        "FIN_INS_RE": 6.2,
+        "HEALTH_SOC": 6.3,
+        "MANU": 5.7,
+        "RETAIL": 5.5,
+        "PUB_NPO": 6.0,
+        "CONST": 5.6,
+        "EDU": 6.4,
+        "PRO_SERV": 6.7,
+        "HOSP_TOUR": 5.6,
+        "TRANS_LOG": 5.4,
+        "INFO_MEDIA_TEL": 6.7,
+        "AGRI": 5.6,
+        "MIN_ENE": 5.9,
+        "WHOLE": 5.6,
+        "ART_CULT_SPORT": 6.7,
+        "BIZ_FAC_ENV": 5.7,
+        "OTHER_SERV": 5.8
+      },
+      "by_company_size": {
+        "XS": 7.0,
+        "S": 6.6,
+        "M": 6.1,
+        "L": 5.8,
+        "XL": 5.6
+      },
+      "questions": [
+        {
+          "code": "CUL_01",
+          "text_fr": "Les valeurs de l'entreprise sont en accord avec les miennes",
+          "text_en": "The company's values align with mine",
+          "market_average": 6.1
+        },
+        {
+          "code": "CUL_02",
+          "text_fr": "Il y a un esprit d'équipe et de collaboration",
+          "text_en": "There is a spirit of teamwork and collaboration",
+          "market_average": 6.4
+        },
+        {
+          "code": "CUL_03",
+          "text_fr": "Mon entreprise agit de manière éthique et responsable",
+          "text_en": "My company acts ethically and responsibly",
+          "market_average": 6.2
+        }
+      ]
+    },
+    {
+      "code": "WELLBEING",
+      "label_fr": "Bien-être & Santé",
+      "label_en": "Wellbeing & Health",
+      "market_average": 5.9,
+      "by_industry": {
+        "TECH": 6.5,
+        "FIN_INS_RE": 6.0,
+        "HEALTH_SOC": 5.5,
+        "MANU": 5.5,
+        "RETAIL": 5.2,
+        "PUB_NPO": 6.0,
+        "CONST": 5.3,
+        "EDU": 6.1,
+        "PRO_SERV": 6.2,
+        "HOSP_TOUR": 4.9,
+        "TRANS_LOG": 5.1,
+        "INFO_MEDIA_TEL": 6.3,
+        "AGRI": 5.2,
+        "MIN_ENE": 5.7,
+        "WHOLE": 5.4,
+        "ART_CULT_SPORT": 5.9,
+        "BIZ_FAC_ENV": 5.5,
+        "OTHER_SERV": 5.6
+      },
+      "by_company_size": {
+        "XS": 6.3,
+        "S": 6.1,
+        "M": 5.9,
+        "L": 5.7,
+        "XL": 5.5
+      },
+      "questions": [
+        {
+          "code": "WEL_01",
+          "text_fr": "Mon entreprise se soucie de mon bien-être",
+          "text_en": "My company cares about my wellbeing",
+          "market_average": 5.7
+        },
+        {
+          "code": "WEL_02",
+          "text_fr": "Je ne ressens pas de stress excessif au travail",
+          "text_en": "I do not experience excessive stress at work",
+          "market_average": 5.3
+        },
+        {
+          "code": "WEL_03",
+          "text_fr": "Je me sens soutenu(e) en cas de difficulté personnelle",
+          "text_en": "I feel supported when facing personal difficulties",
+          "market_average": 5.8
+        }
+      ]
+    },
+    {
+      "code": "SATISFACTION",
+      "label_fr": "Satisfaction globale",
+      "label_en": "Overall Satisfaction",
+      "market_average": 6.3,
+      "by_industry": {
+        "TECH": 7.0,
+        "FIN_INS_RE": 6.4,
+        "HEALTH_SOC": 6.3,
+        "MANU": 5.9,
+        "RETAIL": 5.6,
+        "PUB_NPO": 6.2,
+        "CONST": 5.8,
+        "EDU": 6.5,
+        "PRO_SERV": 6.8,
+        "HOSP_TOUR": 5.5,
+        "TRANS_LOG": 5.6,
+        "INFO_MEDIA_TEL": 6.8,
+        "AGRI": 5.7,
+        "MIN_ENE": 6.1,
+        "WHOLE": 5.8,
+        "ART_CULT_SPORT": 6.6,
+        "BIZ_FAC_ENV": 5.9,
+        "OTHER_SERV": 6.0
+      },
+      "by_company_size": {
+        "XS": 6.9,
+        "S": 6.6,
+        "M": 6.2,
+        "L": 6.0,
+        "XL": 5.8
+      },
+      "questions": [
+        {
+          "code": "SAT_01",
+          "text_fr": "Globalement, je suis satisfait(e) de mon travail",
+          "text_en": "Overall, I am satisfied with my job",
+          "market_average": 6.5
+        },
+        {
+          "code": "SAT_02",
+          "text_fr": "Je trouve du sens dans mon travail quotidien",
+          "text_en": "I find meaning in my daily work",
+          "market_average": 6.4
+        },
+        {
+          "code": "SAT_03",
+          "text_fr": "Je recommanderais mon entreprise à un proche (eNPS)",
+          "text_en": "I would recommend my company to a friend (eNPS)",
+          "market_average": 6.1
+        }
+      ]
+    }
+  ]
+}
