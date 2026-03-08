@@ -39,7 +39,17 @@ import {
   AlertTriangle,
   RefreshCw,
   CheckCircle,
+  KeyRound,
+  Globe,
+  Info,
 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  type DistributionMode,
+  type SelfDeclarationField,
+  SELF_DECLARATION_FIELDS,
+  SELF_DECLARATION_LABELS,
+} from "@/lib/types";
 import { toast } from "sonner";
 import Link from "next/link";
 import QRCode from "qrcode";
@@ -64,6 +74,9 @@ export default function DistributePage() {
     societe_id: string | null;
     survey_type: string;
     filters: Record<string, unknown>;
+    distribution_mode: DistributionMode;
+    open_self_declaration_fields: SelfDeclarationField[];
+    estimated_population: number | null;
   } | null>(null);
   const [hasSurveyTokens, setHasSurveyTokens] = useState(false);
   const [tokens, setTokens] = useState<TokenInfo[]>([]);
@@ -103,7 +116,7 @@ export default function DistributePage() {
     // Load survey
     const { data: surveyData } = await supabase
       .from("surveys")
-      .select("title_fr, status, societe_id, survey_type, filters")
+      .select("title_fr, status, societe_id, survey_type, filters, distribution_mode, open_self_declaration_fields, estimated_population")
       .eq("id", surveyId)
       .single();
 
@@ -188,13 +201,18 @@ export default function DistributePage() {
       }
     }
 
-    // Count responses
+    // Count responses (token + open)
     const { count } = await supabase
       .from("responses")
       .select("id", { count: "exact", head: true })
       .eq("survey_id", surveyId);
 
-    setResponseCount(count || 0);
+    const { count: openCount } = await supabase
+      .from("open_responses")
+      .select("id", { count: "exact", head: true })
+      .eq("survey_id", surveyId);
+
+    setResponseCount((count || 0) + (openCount || 0));
 
     if (useSurveyTokens) {
       // Email stats from survey_tokens
@@ -557,6 +575,45 @@ export default function DistributePage() {
     setRegenerating(false);
   }
 
+  function updateDistributionMode(mode: DistributionMode) {
+    setSurvey((prev) => prev ? { ...prev, distribution_mode: mode } : prev);
+  }
+
+  function toggleSelfDeclarationField(field: SelfDeclarationField) {
+    if (!survey) return;
+    const current = survey.open_self_declaration_fields || [];
+    const updated = current.includes(field)
+      ? current.filter((f) => f !== field)
+      : [...current, field];
+    setSurvey((prev) => prev ? { ...prev, open_self_declaration_fields: updated } : prev);
+  }
+
+  function updateEstimatedPopulation(value: number | null) {
+    setSurvey((prev) => prev ? { ...prev, estimated_population: value } : prev);
+  }
+
+  const [savingConfig, setSavingConfig] = useState(false);
+
+  async function saveDistributionConfig() {
+    if (!survey) return;
+    setSavingConfig(true);
+    const { error } = await supabase
+      .from("surveys")
+      .update({
+        distribution_mode: survey.distribution_mode,
+        open_self_declaration_fields: survey.open_self_declaration_fields,
+        estimated_population: survey.estimated_population,
+      })
+      .eq("id", surveyId);
+
+    if (error) {
+      toast.error("Erreur lors de la sauvegarde");
+    } else {
+      toast.success("Configuration de distribution enregistrée");
+    }
+    setSavingConfig(false);
+  }
+
   function getIframeCode() {
     return `<iframe src="${genericLink}" width="100%" height="700" frameborder="0" style="border: 1px solid #e5e7eb; border-radius: 8px;"></iframe>`;
   }
@@ -599,15 +656,188 @@ export default function DistributePage() {
         </Link>
       </div>
 
+      {/* Distribution Mode Selector */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Mode de distribution</CardTitle>
+          <CardDescription>
+            Choisissez comment les répondants accèdent au sondage.
+            {responseCount > 0 && " Le mode ne peut plus être modifié une fois des réponses reçues."}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-2">
+            {/* Token mode */}
+            <button
+              type="button"
+              disabled={responseCount > 0}
+              onClick={() => updateDistributionMode("token")}
+              className={`relative rounded-lg border-2 p-4 text-left transition-colors ${
+                survey?.distribution_mode === "token"
+                  ? "border-primary bg-primary/5"
+                  : "border-muted hover:border-muted-foreground/30"
+              } ${responseCount > 0 ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}
+            >
+              {survey?.distribution_mode === "token" && (
+                <Badge className="absolute top-2 right-2" variant="default">Recommandé</Badge>
+              )}
+              {survey?.distribution_mode !== "token" && (
+                <Badge className="absolute top-2 right-2" variant="outline">Recommandé</Badge>
+              )}
+              <div className="flex items-center gap-2 mb-2">
+                <KeyRound className="h-5 w-5 text-primary" />
+                <span className="font-semibold">Distribution par token</span>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Chaque employé reçoit un lien unique. Empêche les réponses multiples et permet
+                de segmenter les résultats selon les variables RH enregistrées.
+              </p>
+            </button>
+
+            {/* Open mode */}
+            <button
+              type="button"
+              disabled={responseCount > 0}
+              onClick={() => updateDistributionMode("open")}
+              className={`relative rounded-lg border-2 p-4 text-left transition-colors ${
+                survey?.distribution_mode === "open"
+                  ? "border-primary bg-primary/5"
+                  : "border-muted hover:border-muted-foreground/30"
+              } ${responseCount > 0 ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <Globe className="h-5 w-5 text-blue-500" />
+                <span className="font-semibold">Accès libre</span>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Toute personne disposant du lien ou du QR code peut répondre.
+                Plus simple à diffuser, mais moins de contrôle sur les doublons.
+              </p>
+            </button>
+          </div>
+
+          {survey?.distribution_mode === "token" && (
+            <div className="flex items-start gap-2 rounded-lg bg-blue-50 p-3 text-sm text-blue-800">
+              <Info className="mt-0.5 h-4 w-4 shrink-0" />
+              <p>
+                Les résultats sont automatiquement segmentés selon la structure organisationnelle
+                et les variables RH importées. Un seul réponse par token garanti.
+              </p>
+            </div>
+          )}
+
+          {survey?.distribution_mode === "open" && (
+            <div className="space-y-4">
+              <div className="flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
+                <Info className="mt-0.5 h-4 w-4 shrink-0" />
+                <p>
+                  Les doublons sont limités par le navigateur (cookie). Pour segmenter les résultats,
+                  configurez les variables d&apos;auto-déclaration ci-dessous. Elles seront présentées
+                  au répondant en fin de questionnaire.
+                </p>
+              </div>
+
+              {/* Self-declaration fields */}
+              <div>
+                <Label className="text-sm font-medium">
+                  Variables d&apos;auto-déclaration (obligatoires pour le répondant)
+                </Label>
+                <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {SELF_DECLARATION_FIELDS.map((field) => (
+                    <label
+                      key={field}
+                      className="flex items-center gap-2 rounded-md border p-2 text-sm cursor-pointer hover:bg-muted/50"
+                    >
+                      <Checkbox
+                        checked={(survey.open_self_declaration_fields || []).includes(field)}
+                        onCheckedChange={() => toggleSelfDeclarationField(field)}
+                        disabled={responseCount > 0}
+                      />
+                      {SELF_DECLARATION_LABELS[field]}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Estimated population */}
+              <div>
+                <Label htmlFor="estimated-pop" className="text-sm font-medium">
+                  Population estimée (pour le calcul du taux de réponse)
+                </Label>
+                <Input
+                  id="estimated-pop"
+                  type="number"
+                  min={1}
+                  placeholder="Ex : 150"
+                  className="mt-1 max-w-[200px]"
+                  value={survey.estimated_population ?? ""}
+                  onChange={(e) => {
+                    const val = e.target.value ? parseInt(e.target.value, 10) : null;
+                    setSurvey((prev) => prev ? { ...prev, estimated_population: val } : prev);
+                  }}
+                />
+              </div>
+
+              {/* Save button */}
+              <Button
+                onClick={saveDistributionConfig}
+                disabled={savingConfig}
+                className="w-full sm:w-auto"
+              >
+                {savingConfig ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Enregistrement...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="mr-2 h-4 w-4" />
+                    Valider la configuration
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
+
+          {/* Save button for token mode change */}
+          {survey?.distribution_mode === "token" && (
+            <Button
+              onClick={saveDistributionConfig}
+              disabled={savingConfig}
+              variant="outline"
+              className="w-full sm:w-auto"
+            >
+              {savingConfig ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Enregistrement...
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="mr-2 h-4 w-4" />
+                  Valider la configuration
+                </>
+              )}
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Stats */}
       <div className="grid gap-4 sm:grid-cols-3">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-2">
               <Users className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Tokens</span>
+              <span className="text-sm text-muted-foreground">
+                {survey?.distribution_mode === "open" ? "Population estimée" : "Tokens"}
+              </span>
             </div>
-            <p className="mt-1 text-2xl font-bold">{tokens.length}</p>
+            <p className="mt-1 text-2xl font-bold">
+              {survey?.distribution_mode === "open"
+                ? (survey.estimated_population ?? "—")
+                : tokens.length}
+            </p>
           </CardContent>
         </Card>
         <Card>
@@ -626,14 +856,21 @@ export default function DistributePage() {
               <span className="text-sm text-muted-foreground">Taux</span>
             </div>
             <p className="mt-1 text-2xl font-bold">
-              {tokens.length > 0
-                ? `${Math.round((responseCount / tokens.length) * 100)}%`
-                : "—"}
+              {survey?.distribution_mode === "open"
+                ? (survey.estimated_population && survey.estimated_population > 0
+                    ? `${Math.round((responseCount / survey.estimated_population) * 100)}%`
+                    : "—")
+                : (tokens.length > 0
+                    ? `${Math.round((responseCount / tokens.length) * 100)}%`
+                    : "—")}
             </p>
           </CardContent>
         </Card>
       </div>
 
+      {/* ── Token-only sections ── */}
+      {survey?.distribution_mode !== "open" && (
+      <>
       {/* Sync from Structure */}
       <Card>
         <CardHeader>
@@ -738,6 +975,9 @@ export default function DistributePage() {
         </CardContent>
       </Card>
 
+      </>
+      )}
+
       {/* Link */}
       <Card>
         <CardHeader>
@@ -746,9 +986,9 @@ export default function DistributePage() {
             Lien de partage
           </CardTitle>
           <CardDescription>
-            Lien générique (sans token). Les répondants devront saisir leur
-            token manuellement, ou utilisez le CSV pour des liens
-            personnalisés.
+            {survey?.distribution_mode === "open"
+              ? "Partagez ce lien pour permettre à quiconque de répondre au sondage."
+              : "Lien générique (sans token). Les répondants devront saisir leur token manuellement, ou utilisez le CSV pour des liens personnalisés."}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -816,6 +1056,9 @@ export default function DistributePage() {
         </CardContent>
       </Card>
 
+      {/* ── Token-only: Email, Teams, CSV ── */}
+      {survey?.distribution_mode !== "open" && (
+      <>
       {/* Email Distribution */}
       <Card>
         <CardHeader>
@@ -1042,6 +1285,8 @@ export default function DistributePage() {
           </Button>
         </CardContent>
       </Card>
+      </>
+      )}
     </div>
   );
 }

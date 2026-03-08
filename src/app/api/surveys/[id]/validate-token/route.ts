@@ -15,6 +15,20 @@ export async function POST(
     return NextResponse.json({ valid: false }, { status: 400 });
   }
 
+  // Open mode surveys don't use tokens
+  const { data: surveyCheck } = await supabase
+    .from("surveys")
+    .select("distribution_mode")
+    .eq("id", surveyId)
+    .single();
+
+  if (surveyCheck?.distribution_mode === "open") {
+    return NextResponse.json(
+      { valid: false, error: "Ce sondage utilise l'accès libre" },
+      { status: 400 }
+    );
+  }
+
   // Check that the token exists and is active
   const { data: tokenData } = await supabase
     .from("anonymous_tokens")

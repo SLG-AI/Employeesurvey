@@ -9,6 +9,34 @@ export type SurveyStatus = "draft" | "published" | "closed";
 
 export type SurveyType = "classique" | "pulse";
 
+export type DistributionMode = "token" | "open";
+
+export const SELF_DECLARATION_FIELDS = [
+  "sexe",
+  "fonction",
+  "lieu_travail",
+  "type_contrat",
+  "temps_travail",
+  "cost_center",
+  "direction",
+  "departement",
+  "service",
+] as const;
+
+export type SelfDeclarationField = (typeof SELF_DECLARATION_FIELDS)[number];
+
+export const SELF_DECLARATION_LABELS: Record<SelfDeclarationField, string> = {
+  sexe: "Sexe",
+  fonction: "Fonction",
+  lieu_travail: "Lieu de travail",
+  type_contrat: "Type de contrat",
+  temps_travail: "Temps de travail",
+  cost_center: "Cost center",
+  direction: "Direction",
+  departement: "Département",
+  service: "Service",
+};
+
 export type Survey = {
   id: string;
   title_fr: string;
@@ -29,6 +57,9 @@ export type Survey = {
   survey_type: SurveyType;
   sample_percentage: number | null;
   filters: SurveyFilters;
+  distribution_mode: DistributionMode;
+  open_self_declaration_fields: SelfDeclarationField[];
+  estimated_population: number | null;
 };
 
 export type SurveyFilters = {
@@ -119,6 +150,22 @@ export type AnonymousToken = {
   type_contrat: string | null;
   temps_travail: string | null;
   cost_center: string | null;
+};
+
+export type OpenResponse = {
+  id: string;
+  survey_id: string;
+  respondent_fingerprint: string;
+  sexe: string | null;
+  fonction: string | null;
+  lieu_travail: string | null;
+  type_contrat: string | null;
+  temps_travail: string | null;
+  cost_center: string | null;
+  direction: string | null;
+  departement: string | null;
+  service: string | null;
+  submitted_at: string;
 };
 
 export type EmailSendResult = {

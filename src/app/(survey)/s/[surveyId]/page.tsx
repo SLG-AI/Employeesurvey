@@ -34,12 +34,20 @@ import {
 import { toast } from "sonner";
 import { AVAILABLE_LANGUAGES, getUIString } from "@/lib/utils/languages";
 
+import {
+  type DistributionMode,
+  type SelfDeclarationField,
+  SELF_DECLARATION_LABELS,
+} from "@/lib/types";
+
 type SurveyData = {
   id: string;
   title_fr: string;
   description_fr: string | null;
   introduction_fr: string | null;
   status: string;
+  distribution_mode?: DistributionMode;
+  open_self_declaration_fields?: SelfDeclarationField[];
 };
 
 type SectionData = {
@@ -96,6 +104,16 @@ function sanitizeToken(raw: string): string {
     .trim();
 }
 
+function getOrCreateFingerprint(surveyId: string): string {
+  const key = `survey_fp_${surveyId}`;
+  let fp = localStorage.getItem(key);
+  if (!fp) {
+    fp = crypto.randomUUID();
+    localStorage.setItem(key, fp);
+  }
+  return fp;
+}
+
 export default function SurveyRespondentPage() {
   const params = useParams();
   const searchParams = useSearchParams();
@@ -119,8 +137,13 @@ export default function SurveyRespondentPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [selfDeclaration, setSelfDeclaration] = useState<Record<string, string>>({});
+  const [alreadySubmittedOpen, setAlreadySubmittedOpen] = useState(false);
 
-  const totalSteps = questions.length + 2;
+  const isOpenMode = survey?.distribution_mode === "open";
+  const selfDeclFields = survey?.open_self_declaration_fields || [];
+  const hasSelfDecl = isOpenMode && selfDeclFields.length > 0;
+  const totalSteps = questions.length + 2 + (hasSelfDecl ? 1 : 0);
   const ui = (key: string, replacements?: Record<string, string | number>) =>
     getUIString(lang, key, replacements);
 
@@ -141,6 +164,15 @@ export default function SurveyRespondentPage() {
       setSurvey(data.survey);
       setSurveySections(data.sections || []);
       setQuestions(data.questions || []);
+
+      // Check open mode duplicate
+      if (data.survey.distribution_mode === "open" && !isPreview) {
+        const submitted = localStorage.getItem(`survey_submitted_${surveyId}`);
+        if (submitted === "true") {
+          setAlreadySubmittedOpen(true);
+        }
+      }
+
       if (data.branding) {
         setBranding(data.branding);
         // Load Google Font if specified
@@ -305,12 +337,22 @@ export default function SurveyRespondentPage() {
   }
 
   function canProceed(): boolean {
-    if (currentStep === 0) return isPreview || (tokenValidated && !!token);
+    if (currentStep === 0) {
+      if (isPreview) return true;
+      if (isOpenMode) return true; // No token needed
+      return tokenValidated && !!token;
+    }
     if (currentStep > 0 && currentStep <= questions.length) {
       if (isPreview) return true;
       const question = questions[currentStep - 1];
       if (question.required) return isQuestionAnswered(question);
       return true;
+    }
+    // Self-declaration step (only in open mode)
+    const selfDeclStep = questions.length + 1;
+    if (hasSelfDecl && currentStep === selfDeclStep) {
+      if (isPreview) return true;
+      return selfDeclFields.every((f) => selfDeclaration[f]?.trim());
     }
     return true;
   }
@@ -322,16 +364,27 @@ export default function SurveyRespondentPage() {
       .map((q) => ({ question_id: q.id, ...answers[q.id] }));
 
     try {
+      const body = isOpenMode
+        ? {
+            respondent_fingerprint: getOrCreateFingerprint(surveyId),
+            answers: answersList,
+            self_declaration: selfDeclaration,
+          }
+        : { token, answers: answersList };
+
       const res = await fetch(`/api/surveys/${surveyId}/submit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, answers: answersList }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (!res.ok) {
         toast.error(data.error || "Erreur lors de la soumission");
         setSubmitting(false);
         return;
+      }
+      if (isOpenMode) {
+        localStorage.setItem(`survey_submitted_${surveyId}`, "true");
       }
       router.push("/thank-you");
     } catch {
@@ -361,6 +414,19 @@ export default function SurveyRespondentPage() {
   }
 
   if (!survey) return null;
+
+  if (alreadySubmittedOpen) {
+    return (
+      <div className="flex min-h-screen items-center justify-center px-4">
+        <Card className="w-full max-w-md text-center">
+          <CardContent className="pt-6 space-y-2">
+            <p className="text-lg font-medium">Merci !</p>
+            <p className="text-muted-foreground">Vous avez déjà répondu à ce sondage.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   const progress = (currentStep / (totalSteps - 1)) * 100;
 
@@ -456,7 +522,7 @@ export default function SurveyRespondentPage() {
                   <p className="text-sm text-muted-foreground text-center">
                     {ui("anonymous_notice")}
                   </p>
-                  {!isPreview && !tokenValidated && (
+                  {!isPreview && !isOpenMode && !tokenValidated && (
                     <div className="space-y-2">
                       <Label>{ui("enter_token")}</Label>
                       <Input
@@ -482,7 +548,7 @@ export default function SurveyRespondentPage() {
                       </Button>
                     </div>
                   )}
-                  {!isPreview && tokenValidated && (
+                  {!isPreview && !isOpenMode && tokenValidated && (
                     <p
                       className="text-center text-sm text-green-600"
                       style={branding?.accent_color ? { color: branding.accent_color } : undefined}
@@ -522,8 +588,42 @@ export default function SurveyRespondentPage() {
               );
             })()}
 
+            {/* Self-declaration step (open mode only) */}
+            {hasSelfDecl && currentStep === questions.length + 1 && (
+              <Card>
+                <CardHeader className="text-center">
+                  <CardTitle>Quelques informations sur vous</CardTitle>
+                  <CardDescription>
+                    Ces informations permettent d&apos;analyser les résultats de manière anonyme.
+                    Tous les champs sont obligatoires.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {selfDeclFields.map((field) => (
+                    <div key={field} className="space-y-1">
+                      <Label htmlFor={`sd-${field}`}>
+                        {SELF_DECLARATION_LABELS[field]}
+                        <span className="text-destructive ml-1">*</span>
+                      </Label>
+                      <Input
+                        id={`sd-${field}`}
+                        value={selfDeclaration[field] || ""}
+                        onChange={(e) =>
+                          setSelfDeclaration((prev) => ({
+                            ...prev,
+                            [field]: e.target.value,
+                          }))
+                        }
+                        placeholder={SELF_DECLARATION_LABELS[field]}
+                      />
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+
             {/* Confirmation step */}
-            {currentStep === questions.length + 1 && (
+            {currentStep === questions.length + 1 + (hasSelfDecl ? 1 : 0) && (
               <Card>
                 <CardHeader className="text-center">
                   <CardTitle>{ui("confirm_title")}</CardTitle>
@@ -585,7 +685,7 @@ export default function SurveyRespondentPage() {
             <ChevronLeft className="mr-1 h-4 w-4" />
             {ui("previous")}
           </Button>
-          {currentStep < questions.length + 1 && (
+          {currentStep < totalSteps - 1 && (
             <Button
               onClick={() => setCurrentStep((s) => s + 1)}
               disabled={!canProceed() || translating}

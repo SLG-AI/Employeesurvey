@@ -88,7 +88,7 @@ type QuestionResult = {
 };
 
 type ResultsData = {
-  survey: { id: string; title_fr: string; title_en: string | null } | null;
+  survey: { id: string; title_fr: string; title_en: string | null; distribution_mode?: string } | null;
   totalResponses: number;
   sections: SectionInfo[];
   questions: QuestionResult[];
@@ -119,6 +119,9 @@ export default function ResultsPage() {
   const [ageMaxFilter, setAgeMaxFilter] = useState("");
   const [seniorityMinFilter, setSeniorityMinFilter] = useState("");
   const [seniorityMaxFilter, setSeniorityMaxFilter] = useState("");
+  const [openDirectionFilter, setOpenDirectionFilter] = useState("");
+  const [openDepartementFilter, setOpenDepartementFilter] = useState("");
+  const [openServiceFilter, setOpenServiceFilter] = useState("");
 
   const loadResults = useCallback(async () => {
     setLoading(true);
@@ -137,6 +140,9 @@ export default function ResultsPage() {
     if (ageMaxFilter) params.set("age_max", ageMaxFilter);
     if (seniorityMinFilter) params.set("seniority_min", seniorityMinFilter);
     if (seniorityMaxFilter) params.set("seniority_max", seniorityMaxFilter);
+    if (openDirectionFilter) params.set("open_direction", openDirectionFilter);
+    if (openDepartementFilter) params.set("open_departement", openDepartementFilter);
+    if (openServiceFilter) params.set("open_service", openServiceFilter);
 
     const res = await fetch(
       `/api/surveys/${surveyId}/results?${params.toString()}`
@@ -150,7 +156,7 @@ export default function ResultsPage() {
     const json = await res.json();
     setData(json);
     setLoading(false);
-  }, [surveyId, societeId, directionId, departmentId, serviceId, sexeFilter, fonctionFilter, lieuTravailFilter, typeContratFilter, tempsTravailFilter, costCenterFilter, ageMinFilter, ageMaxFilter, seniorityMinFilter, seniorityMaxFilter]);
+  }, [surveyId, societeId, directionId, departmentId, serviceId, sexeFilter, fonctionFilter, lieuTravailFilter, typeContratFilter, tempsTravailFilter, costCenterFilter, ageMinFilter, ageMaxFilter, seniorityMinFilter, seniorityMaxFilter, openDirectionFilter, openDepartementFilter, openServiceFilter]);
 
   useEffect(() => {
     loadResults();
@@ -200,8 +206,73 @@ export default function ResultsPage() {
         </Badge>
       </div>
 
-      {/* Org filters */}
-      {data?.organizations && data.organizations.length > 0 && (
+      {/* Open mode text-based org filters */}
+      {data?.survey?.distribution_mode === "open" && (
+        (data.demographicOptions?.open_directions?.length ?? 0) > 0 ||
+        (data.demographicOptions?.open_departements?.length ?? 0) > 0 ||
+        (data.demographicOptions?.open_services?.length ?? 0) > 0
+      ) && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Filtrer par structure (déclarée)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-3 sm:grid-cols-3">
+              {(data.demographicOptions?.open_directions?.length ?? 0) > 0 && (
+                <Select
+                  value={openDirectionFilter}
+                  onValueChange={(v) => setOpenDirectionFilter(v === "all" ? "" : v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Direction" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Toutes les directions</SelectItem>
+                    {data!.demographicOptions!.open_directions!.map((v) => (
+                      <SelectItem key={v} value={v}>{v}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              {(data.demographicOptions?.open_departements?.length ?? 0) > 0 && (
+                <Select
+                  value={openDepartementFilter}
+                  onValueChange={(v) => setOpenDepartementFilter(v === "all" ? "" : v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Département" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tous les départements</SelectItem>
+                    {data!.demographicOptions!.open_departements!.map((v) => (
+                      <SelectItem key={v} value={v}>{v}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              {(data.demographicOptions?.open_services?.length ?? 0) > 0 && (
+                <Select
+                  value={openServiceFilter}
+                  onValueChange={(v) => setOpenServiceFilter(v === "all" ? "" : v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Service" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tous les services</SelectItem>
+                    {data!.demographicOptions!.open_services!.map((v) => (
+                      <SelectItem key={v} value={v}>{v}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Org filters (token mode only) */}
+      {data?.survey?.distribution_mode !== "open" && data?.organizations && data.organizations.length > 0 && (
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Filtrer par structure</CardTitle>

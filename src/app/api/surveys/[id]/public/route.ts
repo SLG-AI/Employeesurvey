@@ -12,7 +12,7 @@ export async function GET(
   // Load survey
   const { data: survey, error: surveyError } = await supabase
     .from("surveys")
-    .select("id, title_fr, description_fr, introduction_fr, status, societe_id")
+    .select("id, title_fr, description_fr, introduction_fr, status, societe_id, distribution_mode, open_self_declaration_fields")
     .eq("id", surveyId)
     .single();
 

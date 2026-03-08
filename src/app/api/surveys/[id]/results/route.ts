@@ -71,7 +71,7 @@ export async function GET(
   // Load survey
   const { data: survey } = await admin
     .from("surveys")
-    .select("id, title_fr, title_en, status")
+    .select("id, title_fr, title_en, status, distribution_mode, open_self_declaration_fields")
     .eq("id", surveyId)
     .single();
 
@@ -79,107 +79,142 @@ export async function GET(
     return NextResponse.json({ error: "Sondage introuvable" }, { status: 404 });
   }
 
-  // Build responses query with org filters
-  let responsesQuery = admin
-    .from("responses")
-    .select("id, societe_id, direction_id, department_id, service_id")
-    .eq("survey_id", surveyId);
+  const isOpenMode = survey.distribution_mode === "open";
+  let totalResponses = 0;
+  let answerSourceFilter: { column: string; ids: string[] } | null = null;
 
-  if (societeId) responsesQuery = responsesQuery.eq("societe_id", societeId);
-  if (directionId) responsesQuery = responsesQuery.eq("direction_id", directionId);
-  if (departmentId) responsesQuery = responsesQuery.eq("department_id", departmentId);
-  if (serviceId) responsesQuery = responsesQuery.eq("service_id", serviceId);
+  if (isOpenMode) {
+    // ── Open mode: query open_responses ──
+    let openQuery = admin
+      .from("open_responses")
+      .select("id, sexe, fonction, lieu_travail, type_contrat, temps_travail, cost_center, direction, departement, service")
+      .eq("survey_id", surveyId);
 
-  // Demographic filters: find matching token_ids first, then filter responses
-  const hasDemographicFilters = sexe || fonction || lieuTravail || typeContrat || tempsTravail || costCenter || ageMin || ageMax || seniorityMin || seniorityMax;
+    // Apply self-declaration demographic filters directly
+    if (sexe) openQuery = openQuery.eq("sexe", sexe);
+    if (fonction) openQuery = openQuery.eq("fonction", fonction);
+    if (lieuTravail) openQuery = openQuery.eq("lieu_travail", lieuTravail);
+    if (typeContrat) openQuery = openQuery.eq("type_contrat", typeContrat);
+    if (tempsTravail) openQuery = openQuery.eq("temps_travail", tempsTravail);
+    if (costCenter) openQuery = openQuery.eq("cost_center", costCenter);
+    // Text-based org filters for open mode
+    if (searchParams.get("open_direction")) openQuery = openQuery.eq("direction", searchParams.get("open_direction")!);
+    if (searchParams.get("open_departement")) openQuery = openQuery.eq("departement", searchParams.get("open_departement")!);
+    if (searchParams.get("open_service")) openQuery = openQuery.eq("service", searchParams.get("open_service")!);
 
-  if (hasDemographicFilters) {
-    // Build a query on anonymous_tokens with demographic filters
-    let tokenQuery = admin
-      .from("anonymous_tokens")
-      .select("id, date_naissance, date_entree")
-      .eq("active", true);
+    const { data: openResponses } = await openQuery;
+    totalResponses = openResponses?.length || 0;
 
-    if (sexe) tokenQuery = tokenQuery.eq("sexe", sexe);
-    if (fonction) tokenQuery = tokenQuery.eq("fonction", fonction);
-    if (lieuTravail) tokenQuery = tokenQuery.eq("lieu_travail", lieuTravail);
-    if (typeContrat) tokenQuery = tokenQuery.eq("type_contrat", typeContrat);
-    if (tempsTravail) tokenQuery = tokenQuery.eq("temps_travail", tempsTravail);
-    if (costCenter) tokenQuery = tokenQuery.eq("cost_center", costCenter);
+    if (totalResponses < ANONYMITY_THRESHOLD) {
+      return NextResponse.json({
+        survey: { id: survey.id, title_fr: survey.title_fr, title_en: survey.title_en, distribution_mode: survey.distribution_mode },
+        totalResponses,
+        questions: [],
+        anonymityBlocked: true,
+        message: `Résultats masqués : moins de ${ANONYMITY_THRESHOLD} répondants (${totalResponses} reçus)`,
+      });
+    }
 
-    const { data: matchingTokens } = await tokenQuery;
+    answerSourceFilter = { column: "open_response_id", ids: openResponses!.map((r) => r.id) };
+  } else {
+    // ── Token mode (existing behavior) ──
+    let responsesQuery = admin
+      .from("responses")
+      .select("id, societe_id, direction_id, department_id, service_id")
+      .eq("survey_id", surveyId);
 
-    if (matchingTokens) {
-      // Apply age/seniority filters in JS
-      let filtered = matchingTokens;
-      const now = new Date();
+    if (societeId) responsesQuery = responsesQuery.eq("societe_id", societeId);
+    if (directionId) responsesQuery = responsesQuery.eq("direction_id", directionId);
+    if (departmentId) responsesQuery = responsesQuery.eq("department_id", departmentId);
+    if (serviceId) responsesQuery = responsesQuery.eq("service_id", serviceId);
 
-      if (ageMin || ageMax) {
-        filtered = filtered.filter((t) => {
-          if (!t.date_naissance) return false;
-          const birth = new Date(t.date_naissance);
-          let age = now.getFullYear() - birth.getFullYear();
-          const m = now.getMonth() - birth.getMonth();
-          if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) age--;
-          if (ageMin && age < Number(ageMin)) return false;
-          if (ageMax && age > Number(ageMax)) return false;
-          return true;
-        });
-      }
+    // Demographic filters: find matching token_ids first, then filter responses
+    const hasDemographicFilters = sexe || fonction || lieuTravail || typeContrat || tempsTravail || costCenter || ageMin || ageMax || seniorityMin || seniorityMax;
 
-      if (seniorityMin || seniorityMax) {
-        filtered = filtered.filter((t) => {
-          if (!t.date_entree) return false;
-          const entry = new Date(t.date_entree);
-          let years = now.getFullYear() - entry.getFullYear();
-          const m = now.getMonth() - entry.getMonth();
-          if (m < 0 || (m === 0 && now.getDate() < entry.getDate())) years--;
-          if (seniorityMin && years < Number(seniorityMin)) return false;
-          if (seniorityMax && years > Number(seniorityMax)) return false;
-          return true;
-        });
-      }
+    if (hasDemographicFilters) {
+      let tokenQuery = admin
+        .from("anonymous_tokens")
+        .select("id, date_naissance, date_entree")
+        .eq("active", true);
 
-      const matchingTokenIds = filtered.map((t) => t.id);
-      if (matchingTokenIds.length > 0) {
-        responsesQuery = responsesQuery.in("token_id", matchingTokenIds);
-      } else {
-        // No matching tokens - return empty results
-        return NextResponse.json({
-          survey: { id: survey.id, title_fr: survey.title_fr, title_en: survey.title_en },
-          totalResponses: 0,
-          sections: [],
-          questions: [],
-          organizations: [],
-          demographicOptions: {},
-          anonymityBlocked: false,
-        });
+      if (sexe) tokenQuery = tokenQuery.eq("sexe", sexe);
+      if (fonction) tokenQuery = tokenQuery.eq("fonction", fonction);
+      if (lieuTravail) tokenQuery = tokenQuery.eq("lieu_travail", lieuTravail);
+      if (typeContrat) tokenQuery = tokenQuery.eq("type_contrat", typeContrat);
+      if (tempsTravail) tokenQuery = tokenQuery.eq("temps_travail", tempsTravail);
+      if (costCenter) tokenQuery = tokenQuery.eq("cost_center", costCenter);
+
+      const { data: matchingTokens } = await tokenQuery;
+
+      if (matchingTokens) {
+        let filtered = matchingTokens;
+        const now = new Date();
+
+        if (ageMin || ageMax) {
+          filtered = filtered.filter((t) => {
+            if (!t.date_naissance) return false;
+            const birth = new Date(t.date_naissance);
+            let age = now.getFullYear() - birth.getFullYear();
+            const m = now.getMonth() - birth.getMonth();
+            if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) age--;
+            if (ageMin && age < Number(ageMin)) return false;
+            if (ageMax && age > Number(ageMax)) return false;
+            return true;
+          });
+        }
+
+        if (seniorityMin || seniorityMax) {
+          filtered = filtered.filter((t) => {
+            if (!t.date_entree) return false;
+            const entry = new Date(t.date_entree);
+            let years = now.getFullYear() - entry.getFullYear();
+            const m = now.getMonth() - entry.getMonth();
+            if (m < 0 || (m === 0 && now.getDate() < entry.getDate())) years--;
+            if (seniorityMin && years < Number(seniorityMin)) return false;
+            if (seniorityMax && years > Number(seniorityMax)) return false;
+            return true;
+          });
+        }
+
+        const matchingTokenIds = filtered.map((t) => t.id);
+        if (matchingTokenIds.length > 0) {
+          responsesQuery = responsesQuery.in("token_id", matchingTokenIds);
+        } else {
+          return NextResponse.json({
+            survey: { id: survey.id, title_fr: survey.title_fr, title_en: survey.title_en, distribution_mode: survey.distribution_mode },
+            totalResponses: 0,
+            sections: [],
+            questions: [],
+            organizations: [],
+            demographicOptions: {},
+            anonymityBlocked: false,
+          });
+        }
       }
     }
+
+    // For managers, filter by allowed orgs
+    if (allowedOrgIds) {
+      responsesQuery = responsesQuery.or(
+        `societe_id.in.(${allowedOrgIds.join(",")}),direction_id.in.(${allowedOrgIds.join(",")}),department_id.in.(${allowedOrgIds.join(",")}),service_id.in.(${allowedOrgIds.join(",")})`
+      );
+    }
+
+    const { data: responses } = await responsesQuery;
+    totalResponses = responses?.length || 0;
+
+    if (totalResponses < ANONYMITY_THRESHOLD) {
+      return NextResponse.json({
+        survey: { id: survey.id, title_fr: survey.title_fr, title_en: survey.title_en, distribution_mode: survey.distribution_mode },
+        totalResponses,
+        questions: [],
+        anonymityBlocked: true,
+        message: `Résultats masqués : moins de ${ANONYMITY_THRESHOLD} répondants (${totalResponses} reçus)`,
+      });
+    }
+
+    answerSourceFilter = { column: "response_id", ids: responses!.map((r) => r.id) };
   }
-
-  // For managers, filter by allowed orgs
-  if (allowedOrgIds) {
-    responsesQuery = responsesQuery.or(
-      `societe_id.in.(${allowedOrgIds.join(",")}),direction_id.in.(${allowedOrgIds.join(",")}),department_id.in.(${allowedOrgIds.join(",")}),service_id.in.(${allowedOrgIds.join(",")})`
-    );
-  }
-
-  const { data: responses } = await responsesQuery;
-  const totalResponses = responses?.length || 0;
-
-  // Anonymity check
-  if (totalResponses < ANONYMITY_THRESHOLD) {
-    return NextResponse.json({
-      survey: { id: survey.id, title_fr: survey.title_fr, title_en: survey.title_en },
-      totalResponses,
-      questions: [],
-      anonymityBlocked: true,
-      message: `Résultats masqués : moins de ${ANONYMITY_THRESHOLD} répondants (${totalResponses} reçus)`,
-    });
-  }
-
-  const responseIds = responses!.map((r) => r.id);
 
   // Load sections
   const { data: sectionRows } = await admin
@@ -203,7 +238,7 @@ export async function GET(
   const { data: allAnswers } = await admin
     .from("answers")
     .select("question_id, numeric_value, text_value, selected_option_ids")
-    .in("response_id", responseIds);
+    .in(answerSourceFilter!.column, answerSourceFilter!.ids);
 
   // Aggregate per question
   const questionResults = questions.map((q) => {
@@ -288,58 +323,91 @@ export async function GET(
     };
   });
 
-  // Get org breakdown for filters
-  const { data: orgs } = await admin
-    .from("organizations")
-    .select("id, name, type, parent_id")
-    .order("name");
-
-  // Get available demographic filter values from survey tokens
+  // Get demographic filter options and org data
   let demographicOptions: Record<string, string[]> = {};
+  let orgs: { id: string; name: string; type: string; parent_id: string | null }[] = [];
 
-  // Get tokens linked to this survey (via survey_tokens or societe_id)
-  const { data: surveyData } = await admin
-    .from("surveys")
-    .select("societe_id")
-    .eq("id", surveyId)
-    .single();
+  if (isOpenMode) {
+    // Open mode: get distinct values from open_responses for this survey
+    const { data: openDemoData } = await admin
+      .from("open_responses")
+      .select("sexe, fonction, lieu_travail, type_contrat, temps_travail, cost_center, direction, departement, service")
+      .eq("survey_id", surveyId);
 
-  let demoQuery = admin
-    .from("anonymous_tokens")
-    .select("sexe, fonction, lieu_travail, type_contrat, temps_travail, cost_center, date_naissance, date_entree")
-    .eq("active", true);
+    if (openDemoData) {
+      const distinct = (key: string) => {
+        const values = new Set<string>();
+        openDemoData.forEach((t: Record<string, unknown>) => {
+          const v = t[key];
+          if (v != null && v !== "") values.add(String(v));
+        });
+        return Array.from(values).sort();
+      };
 
-  if (surveyData?.societe_id) {
-    demoQuery = demoQuery.eq("societe_id", surveyData.societe_id);
-  }
-
-  const { data: demoTokens } = await demoQuery;
-
-  if (demoTokens) {
-    const distinct = (key: string) => {
-      const values = new Set<string>();
-      demoTokens.forEach((t: Record<string, unknown>) => {
-        const v = t[key];
-        if (v != null && v !== "") values.add(String(v));
-      });
-      return Array.from(values).sort();
-    };
-
-    demographicOptions = {
-      sexe: distinct("sexe"),
-      fonctions: distinct("fonction"),
-      lieux_travail: distinct("lieu_travail"),
-      types_contrat: distinct("type_contrat"),
-      temps_travail: distinct("temps_travail"),
-      cost_centers: distinct("cost_center"),
-    };
-
-    // Flag if date fields have data
-    if (demoTokens.some((t: Record<string, unknown>) => t.date_naissance != null)) {
-      demographicOptions.hasDateNaissance = ["true"];
+      // Only include fields that were configured for self-declaration
+      const declFields = (survey.open_self_declaration_fields as string[]) || [];
+      if (declFields.includes("sexe")) demographicOptions.sexe = distinct("sexe");
+      if (declFields.includes("fonction")) demographicOptions.fonctions = distinct("fonction");
+      if (declFields.includes("lieu_travail")) demographicOptions.lieux_travail = distinct("lieu_travail");
+      if (declFields.includes("type_contrat")) demographicOptions.types_contrat = distinct("type_contrat");
+      if (declFields.includes("temps_travail")) demographicOptions.temps_travail = distinct("temps_travail");
+      if (declFields.includes("cost_center")) demographicOptions.cost_centers = distinct("cost_center");
+      // Text-based org filters for open mode
+      if (declFields.includes("direction")) demographicOptions.open_directions = distinct("direction");
+      if (declFields.includes("departement")) demographicOptions.open_departements = distinct("departement");
+      if (declFields.includes("service")) demographicOptions.open_services = distinct("service");
     }
-    if (demoTokens.some((t: Record<string, unknown>) => t.date_entree != null)) {
-      demographicOptions.hasDateEntree = ["true"];
+  } else {
+    // Token mode: existing org + demographic filter logic
+    const { data: orgData } = await admin
+      .from("organizations")
+      .select("id, name, type, parent_id")
+      .order("name");
+
+    orgs = orgData || [];
+
+    const { data: surveyData } = await admin
+      .from("surveys")
+      .select("societe_id")
+      .eq("id", surveyId)
+      .single();
+
+    let demoQuery = admin
+      .from("anonymous_tokens")
+      .select("sexe, fonction, lieu_travail, type_contrat, temps_travail, cost_center, date_naissance, date_entree")
+      .eq("active", true);
+
+    if (surveyData?.societe_id) {
+      demoQuery = demoQuery.eq("societe_id", surveyData.societe_id);
+    }
+
+    const { data: demoTokens } = await demoQuery;
+
+    if (demoTokens) {
+      const distinct = (key: string) => {
+        const values = new Set<string>();
+        demoTokens.forEach((t: Record<string, unknown>) => {
+          const v = t[key];
+          if (v != null && v !== "") values.add(String(v));
+        });
+        return Array.from(values).sort();
+      };
+
+      demographicOptions = {
+        sexe: distinct("sexe"),
+        fonctions: distinct("fonction"),
+        lieux_travail: distinct("lieu_travail"),
+        types_contrat: distinct("type_contrat"),
+        temps_travail: distinct("temps_travail"),
+        cost_centers: distinct("cost_center"),
+      };
+
+      if (demoTokens.some((t: Record<string, unknown>) => t.date_naissance != null)) {
+        demographicOptions.hasDateNaissance = ["true"];
+      }
+      if (demoTokens.some((t: Record<string, unknown>) => t.date_entree != null)) {
+        demographicOptions.hasDateEntree = ["true"];
+      }
     }
   }
 
@@ -348,11 +416,12 @@ export async function GET(
       id: survey.id,
       title_fr: survey.title_fr,
       title_en: survey.title_en,
+      distribution_mode: survey.distribution_mode,
     },
     totalResponses,
     sections: sectionRows || [],
     questions: questionResults,
-    organizations: orgs || [],
+    organizations: orgs,
     demographicOptions,
     anonymityBlocked: false,
   });

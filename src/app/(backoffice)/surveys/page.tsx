@@ -221,7 +221,7 @@ export default function SurveysPage() {
                           <Pencil className="h-4 w-4" />
                         </Button>
                       </Link>
-                      {survey.status === "draft" && (
+                      {(survey.status === "draft" || survey.status === "closed") && (
                         <Button variant="ghost" size="icon" onClick={() => handleDelete(survey)} title="Supprimer">
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
