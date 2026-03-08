@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Pencil, Trash2, Eye, BarChart3 } from "lucide-react";
+import { Plus, Pencil, Trash2, Eye, BarChart3, Copy } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
 import type { Survey } from "@/lib/types";
@@ -92,11 +92,97 @@ export default function SurveysPage() {
     return true;
   });
 
-  async function handleDelete(survey: Survey) {
-    if (survey.status === "published") {
-      toast.error("Impossible de supprimer un sondage publié");
+  async function handleDuplicate(survey: Survey) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      toast.error("Non authentifié");
       return;
     }
+
+    const { data: newSurvey, error: surveyError } = await supabase
+      .from("surveys")
+      .insert({
+        title_fr: `${survey.title_fr} (copie)`,
+        status: "draft",
+        created_by: user.id,
+        societe_id: survey.societe_id,
+      })
+      .select("id")
+      .single();
+
+    if (surveyError || !newSurvey) {
+      toast.error("Erreur lors de la duplication");
+      return;
+    }
+
+    const { data: sections } = await supabase
+      .from("survey_sections")
+      .select("*")
+      .eq("survey_id", survey.id)
+      .order("sort_order");
+
+    for (const sec of sections || []) {
+      const { data: newSec } = await supabase
+        .from("survey_sections")
+        .insert({
+          survey_id: newSurvey.id,
+          title_fr: sec.title_fr,
+          sort_order: sec.sort_order,
+        })
+        .select("id")
+        .single();
+
+      if (!newSec) continue;
+
+      const { data: questions } = await supabase
+        .from("questions")
+        .select("*, question_options(*)")
+        .eq("survey_id", survey.id)
+        .eq("section_id", sec.id)
+        .order("sort_order");
+
+      for (const q of questions || []) {
+        const { data: newQ } = await supabase
+          .from("questions")
+          .insert({
+            survey_id: newSurvey.id,
+            section_id: newSec.id,
+            type: q.type,
+            text_fr: q.text_fr,
+            text_en: q.text_en,
+            question_code: q.question_code,
+            sort_order: q.sort_order,
+            required: q.required,
+          })
+          .select("id")
+          .single();
+
+        if (!newQ) continue;
+
+        const options = (q.question_options || []).map(
+          (o: { text_fr: string; text_en: string | null; value: string | null; sort_order: number }) => ({
+            question_id: newQ.id,
+            text_fr: o.text_fr,
+            text_en: o.text_en,
+            value: o.value,
+            sort_order: o.sort_order,
+          })
+        );
+
+        if (options.length > 0) {
+          await supabase.from("question_options").insert(options);
+        }
+      }
+    }
+
+    toast.success("Sondage dupliqué");
+    loadSurveys();
+  }
+
+  async function handleDelete(survey: Survey) {
     if (!confirm(`Supprimer le sondage "${survey.title_fr}" ?`)) return;
 
     const res = await fetch(`/api/surveys/${survey.id}`, { method: "DELETE" });
@@ -221,11 +307,12 @@ export default function SurveysPage() {
                           <Pencil className="h-4 w-4" />
                         </Button>
                       </Link>
-                      {(survey.status === "draft" || survey.status === "closed") && (
-                        <Button variant="ghost" size="icon" onClick={() => handleDelete(survey)} title="Supprimer">
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      )}
+                      <Button variant="ghost" size="icon" onClick={() => handleDuplicate(survey)} title="Dupliquer">
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => handleDelete(survey)} title="Supprimer">
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
                     </div>
                   </TableCell>
                 </TableRow>
