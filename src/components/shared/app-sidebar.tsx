@@ -90,7 +90,7 @@ export function AppSidebar() {
             <ClipboardList className="h-4 w-4" />
           </div>
           <div className="flex flex-col">
-            <span className="text-lg font-bold">PulseSurvey</span>
+            <span className="text-lg font-bold">Loud&amp;Clear</span>
             {!loading && tenant && (
               <span className="text-xs text-muted-foreground truncate max-w-[140px]">
                 {tenant.name}

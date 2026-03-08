@@ -14,7 +14,7 @@ export function Navbar() {
         {/* Left: Logo */}
         <Link href="/" className="flex items-center gap-2">
           <BarChart3 className="size-6 text-accent-blue" />
-          <span className="text-lg font-bold">PulseSurvey</span>
+          <span className="text-lg font-bold">Loud&amp;Clear</span>
         </Link>
 
         {/* Center: Desktop nav links */}

@@ -454,7 +454,7 @@ export default function SurveyRespondentPage() {
               <span className="text-sm font-medium">{branding.name}</span>
             </span>
           ) : (
-            <span className="text-sm font-medium">PulseSurvey</span>
+            <span className="text-sm font-medium">Loud&amp;Clear</span>
           )}
           <Select value={lang} onValueChange={(v) => setLang(v)}>
             <SelectTrigger className="w-auto h-8 gap-2">

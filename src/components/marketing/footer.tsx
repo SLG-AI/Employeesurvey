@@ -8,9 +8,9 @@ export function Footer() {
         <div className="flex flex-col items-center gap-2 sm:items-start">
           <div className="flex items-center gap-2">
             <BarChart3 className="size-5 text-white" />
-            <span className="font-semibold text-white">PulseSurvey</span>
+            <span className="font-semibold text-white">Loud&amp;Clear</span>
           </div>
-          <p className="text-sm">&copy; 2026 PulseSurvey</p>
+          <p className="text-sm">&copy; 2026 Loud&amp;Clear</p>
         </div>
 
         {/* Right: Links */}

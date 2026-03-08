@@ -59,7 +59,7 @@ export function AdminSidebar() {
             <LayoutDashboard className="h-4 w-4" />
           </div>
           <div className="flex flex-col">
-            <span className="text-lg font-bold">PulseSurvey</span>
+            <span className="text-lg font-bold">Loud&amp;Clear</span>
             <span className="text-xs text-muted-foreground">Super Admin</span>
           </div>
         </Link>

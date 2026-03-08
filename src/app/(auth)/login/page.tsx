@@ -47,7 +47,7 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-muted/50 px-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold">PulseSurvey</CardTitle>
+          <CardTitle className="text-2xl font-bold">Loud&amp;Clear</CardTitle>
           <CardDescription>
             Connectez-vous pour accéder à la plateforme
           </CardDescription>

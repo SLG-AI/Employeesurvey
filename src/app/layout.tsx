@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "PulseSurvey",
+  title: "Loud&Clear",
   description:
     "Plateforme d'enquêtes et sondages employés avec anonymat garanti",
 };

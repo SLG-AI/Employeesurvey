@@ -245,7 +245,7 @@ function BillingContent() {
                   : "Votre abonnement est annule"}
               </h3>
               <p className="text-sm text-amber-700">
-                Souscrivez a un abonnement pour continuer a utiliser PulseSurvey.
+                Souscrivez a un abonnement pour continuer a utiliser Loud&amp;Clear.
               </p>
             </div>
             <Button

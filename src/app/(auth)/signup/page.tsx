@@ -139,7 +139,7 @@ function SignupContent() {
       return;
     }
 
-    toast.success("Bienvenue sur PulseSurvey !", {
+    toast.success("Bienvenue sur Loud&Clear !", {
       description: "Votre essai gratuit de 30 jours a commencé.",
     });
     router.push("/dashboard");
@@ -188,7 +188,7 @@ function SignupContent() {
                 Créer votre compte
               </CardTitle>
               <CardDescription>
-                Commencez avec PulseSurvey en quelques minutes
+                Commencez avec Loud&amp;Clear en quelques minutes
               </CardDescription>
             </CardHeader>
             <CardContent>

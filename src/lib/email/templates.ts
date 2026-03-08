@@ -44,7 +44,7 @@ export function generateEmailHtml(
 </head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
   <div style="background-color: #f8f9fa; border-radius: 8px; padding: 24px; margin-bottom: 24px;">
-    <h1 style="color: #2563eb; margin: 0; font-size: 24px;">PulseSurvey</h1>
+    <h1 style="color: #2563eb; margin: 0; font-size: 24px;">Loud&Clear</h1>
   </div>
 
   <div style="margin-bottom: 24px;">

@@ -8,7 +8,7 @@ import {
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-const FROM_EMAIL = "PulseSurvey <onboarding@resend.dev>";
+const FROM_EMAIL = "Loud&Clear <onboarding@resend.dev>";
 const BATCH_SIZE = 100;
 
 export interface EmailRecipient {

@@ -1068,7 +1068,7 @@ export default function DistributePage() {
           </CardTitle>
           <CardDescription>
             Envoyez des invitations et des rappels directement depuis
-            PulseSurvey. Chaque email contient un lien unique et anonyme.
+            Loud&amp;Clear. Chaque email contient un lien unique et anonyme.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
