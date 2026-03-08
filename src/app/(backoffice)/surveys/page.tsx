@@ -12,7 +12,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Pencil, Trash2, Eye } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Plus, Pencil, Trash2, Eye, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
 import type { Survey } from "@/lib/types";
@@ -36,6 +43,9 @@ const STATUS_COLORS: Record<string, "default" | "secondary" | "destructive" | "o
 export default function SurveysPage() {
   const [surveys, setSurveys] = useState<SurveyWithSociete[]>([]);
   const [loading, setLoading] = useState(true);
+  const [societes, setSocietes] = useState<{ id: string; name: string }[]>([]);
+  const [filterSociete, setFilterSociete] = useState<string>("all");
+  const [filterStatus, setFilterStatus] = useState<string>("all");
   const supabase = createClient();
 
   const loadSurveys = useCallback(async () => {
@@ -63,6 +73,24 @@ export default function SurveysPage() {
   useEffect(() => {
     loadSurveys();
   }, [loadSurveys]);
+
+  useEffect(() => {
+    async function loadSocietes() {
+      const { data } = await supabase
+        .from("organizations")
+        .select("id, name")
+        .eq("type", "societe")
+        .order("name");
+      setSocietes(data || []);
+    }
+    loadSocietes();
+  }, [supabase]);
+
+  const filteredSurveys = surveys.filter((s) => {
+    if (filterSociete !== "all" && s.societe?.id !== filterSociete) return false;
+    if (filterStatus !== "all" && s.status !== filterStatus) return false;
+    return true;
+  });
 
   async function handleDelete(survey: Survey) {
     if (survey.status === "published") {
@@ -98,6 +126,31 @@ export default function SurveysPage() {
         </Link>
       </div>
 
+      <div className="flex gap-4">
+        <Select value={filterSociete} onValueChange={setFilterSociete}>
+          <SelectTrigger className="w-[200px]">
+            <SelectValue placeholder="Societe" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Toutes les societes</SelectItem>
+            {societes.map((s) => (
+              <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={filterStatus} onValueChange={setFilterStatus}>
+          <SelectTrigger className="w-[200px]">
+            <SelectValue placeholder="Statut" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tous les statuts</SelectItem>
+            <SelectItem value="draft">En preparation</SelectItem>
+            <SelectItem value="published">Publie</SelectItem>
+            <SelectItem value="closed">Cloture</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
       <div className="rounded-md border">
         <Table>
           <TableHeader>
@@ -117,14 +170,14 @@ export default function SurveysPage() {
                   Chargement...
                 </TableCell>
               </TableRow>
-            ) : surveys.length === 0 ? (
+            ) : filteredSurveys.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                   Aucun sondage. Créez votre premier sondage.
                 </TableCell>
               </TableRow>
             ) : (
-              surveys.map((survey) => (
+              filteredSurveys.map((survey) => (
                 <TableRow key={survey.id}>
                   <TableCell className="font-medium">
                     <Link href={`/surveys/${survey.id}/edit`} className="hover:underline">
@@ -151,18 +204,25 @@ export default function SurveysPage() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
+                      {survey.status === "closed" && (
+                        <Link href={`/surveys/${survey.id}/results`}>
+                          <Button variant="ghost" size="icon" title="Voir les resultats">
+                            <BarChart3 className="h-4 w-4 text-primary" />
+                          </Button>
+                        </Link>
+                      )}
                       <Link href={`/s/${survey.id}?preview=1`} target="_blank">
                         <Button variant="ghost" size="icon" title="Prévisualiser">
                           <Eye className="h-4 w-4" />
                         </Button>
                       </Link>
                       <Link href={`/surveys/${survey.id}/edit`}>
-                        <Button variant="ghost" size="icon">
+                        <Button variant="ghost" size="icon" title="Editer">
                           <Pencil className="h-4 w-4" />
                         </Button>
                       </Link>
                       {survey.status === "draft" && (
-                        <Button variant="ghost" size="icon" onClick={() => handleDelete(survey)}>
+                        <Button variant="ghost" size="icon" onClick={() => handleDelete(survey)} title="Supprimer">
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       )}
