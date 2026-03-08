@@ -511,12 +511,19 @@ export async function getAdminActivityLogs(
 
 // --- Benchmarks ---
 
+type BenchmarkDetail = { avg: number; p25: number; p50: number; p75: number };
+
 export type BenchmarkQuestionData = {
   id?: string;
   code: string;
   text_fr: string;
   text_en: string;
   market_average: number;
+  p25: number | null;
+  p50: number | null;
+  p75: number | null;
+  by_industry: Record<string, BenchmarkDetail>;
+  by_company_size: Record<string, BenchmarkDetail>;
   sort_order: number;
 };
 
@@ -526,8 +533,11 @@ export type BenchmarkThemeData = {
   label_fr: string;
   label_en: string;
   market_average: number;
-  by_industry: Record<string, number>;
-  by_company_size: Record<string, number>;
+  p25: number | null;
+  p50: number | null;
+  p75: number | null;
+  by_industry: Record<string, BenchmarkDetail>;
+  by_company_size: Record<string, BenchmarkDetail>;
   sort_order: number;
   updated_at: string;
   benchmark_questions: BenchmarkQuestionData[];
@@ -551,44 +561,53 @@ export async function saveBenchmarkTheme(theme: {
   label_fr: string;
   label_en: string;
   market_average: number;
-  by_industry: Record<string, number>;
-  by_company_size: Record<string, number>;
+  p25?: number | null;
+  p50?: number | null;
+  p75?: number | null;
+  by_industry: Record<string, BenchmarkDetail>;
+  by_company_size: Record<string, BenchmarkDetail>;
   sort_order?: number;
-  questions?: { code: string; text_fr: string; text_en: string; market_average: number }[];
+  questions?: {
+    code: string;
+    text_fr: string;
+    text_en: string;
+    market_average: number;
+    p25?: number | null;
+    p50?: number | null;
+    p75?: number | null;
+    by_industry?: Record<string, BenchmarkDetail>;
+    by_company_size?: Record<string, BenchmarkDetail>;
+  }[];
 }): Promise<{ id?: string; error?: string }> {
   const adminUserId = await verifyPlatformAdmin();
   const admin = createAdminClient();
 
   let themeId = theme.id;
 
+  const themePayload = {
+    code: theme.code,
+    label_fr: theme.label_fr,
+    label_en: theme.label_en,
+    market_average: theme.market_average,
+    p25: theme.p25 ?? null,
+    p50: theme.p50 ?? null,
+    p75: theme.p75 ?? null,
+    by_industry: theme.by_industry,
+    by_company_size: theme.by_company_size,
+    sort_order: theme.sort_order || 0,
+  };
+
   if (themeId) {
     const { error } = await admin
       .from("benchmark_themes")
-      .update({
-        code: theme.code,
-        label_fr: theme.label_fr,
-        label_en: theme.label_en,
-        market_average: theme.market_average,
-        by_industry: theme.by_industry,
-        by_company_size: theme.by_company_size,
-        sort_order: theme.sort_order || 0,
-        updated_at: new Date().toISOString(),
-      })
+      .update({ ...themePayload, updated_at: new Date().toISOString() })
       .eq("id", themeId);
 
     if (error) return { error: error.message };
   } else {
     const { data: inserted, error } = await admin
       .from("benchmark_themes")
-      .insert({
-        code: theme.code,
-        label_fr: theme.label_fr,
-        label_en: theme.label_en,
-        market_average: theme.market_average,
-        by_industry: theme.by_industry,
-        by_company_size: theme.by_company_size,
-        sort_order: theme.sort_order || 0,
-      })
+      .insert(themePayload)
       .select("id")
       .single();
 
@@ -608,6 +627,11 @@ export async function saveBenchmarkTheme(theme: {
           text_fr: q.text_fr,
           text_en: q.text_en,
           market_average: q.market_average,
+          p25: q.p25 ?? null,
+          p50: q.p50 ?? null,
+          p75: q.p75 ?? null,
+          by_industry: q.by_industry || {},
+          by_company_size: q.by_company_size || {},
           sort_order: i,
         }))
       );
@@ -666,6 +690,9 @@ export async function seedBenchmarkThemes(): Promise<{ count?: number; error?: s
         label_fr: theme.label_fr,
         label_en: theme.label_en,
         market_average: theme.market_average,
+        p25: theme.p25 ?? null,
+        p50: theme.p50 ?? null,
+        p75: theme.p75 ?? null,
         by_industry: theme.by_industry,
         by_company_size: theme.by_company_size,
         sort_order: i,
@@ -681,12 +708,17 @@ export async function seedBenchmarkThemes(): Promise<{ count?: number; error?: s
 
     if (theme.questions.length > 0) {
       const { error: qError } = await admin.from("benchmark_questions").insert(
-        theme.questions.map((q, j) => ({
+        theme.questions.map((q: Record<string, unknown>, j: number) => ({
           theme_id: inserted.id,
           code: q.code,
           text_fr: q.text_fr,
           text_en: q.text_en,
           market_average: q.market_average,
+          p25: q.p25 ?? null,
+          p50: q.p50 ?? null,
+          p75: q.p75 ?? null,
+          by_industry: q.by_industry || {},
+          by_company_size: q.by_company_size || {},
           sort_order: j,
         }))
       );

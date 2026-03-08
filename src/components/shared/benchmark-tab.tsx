@@ -28,8 +28,15 @@ type ThemeScore = {
   theme_label: string;
   survey_score: number;
   market_average: number;
+  p25: number | null;
+  p50: number | null;
+  p75: number | null;
   industry_average: number | null;
+  industry_p25: number | null;
+  industry_p75: number | null;
   size_average: number | null;
+  size_p25: number | null;
+  size_p75: number | null;
   combined_average: number | null;
   question_count: number;
 };
@@ -253,35 +260,61 @@ export function BenchmarkTab({ surveyId }: { surveyId: string }) {
       <Card>
         <CardHeader>
           <CardTitle>Détail par thème</CardTitle>
+          <CardDescription>
+            Scores comparés à la moyenne marché et aux percentiles (P25 / P50 / P75)
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
             {themes.map((t) => (
               <div
                 key={t.theme_code}
-                className="flex items-center justify-between rounded-lg border p-3"
+                className="rounded-lg border p-3"
               >
-                <div className="flex-1">
-                  <p className="font-medium text-sm">{t.theme_label}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {t.question_count} question(s) mappée(s)
-                  </p>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="text-center">
-                    <p className="text-lg font-bold text-primary">
-                      {t.survey_score}
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <p className="font-medium text-sm">{t.theme_label}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {t.question_count} question(s) mappée(s)
                     </p>
-                    <p className="text-[10px] text-muted-foreground">Score</p>
                   </div>
-                  <div className="text-center">
-                    <p className="text-lg font-bold text-muted-foreground">
-                      {t.market_average}
-                    </p>
-                    <p className="text-[10px] text-muted-foreground">Marché</p>
+                  <div className="flex items-center gap-4">
+                    <div className="text-center">
+                      <p className="text-lg font-bold text-primary">
+                        {t.survey_score}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground">Score</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-lg font-bold text-muted-foreground">
+                        {t.market_average}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground">Marché</p>
+                    </div>
+                    <DiffBadge diff={t.survey_score - t.market_average} />
                   </div>
-                  <DiffBadge diff={t.survey_score - t.market_average} />
                 </div>
+                {(t.p25 !== null || t.p75 !== null) && (
+                  <div className="flex gap-3 mt-2 text-xs text-muted-foreground">
+                    {t.p25 !== null && <span>P25: <span className="font-mono">{t.p25}</span></span>}
+                    {t.p50 !== null && <span>P50: <span className="font-mono">{t.p50}</span></span>}
+                    {t.p75 !== null && <span>P75: <span className="font-mono">{t.p75}</span></span>}
+                    {t.industry_average !== null && (
+                      <span>Secteur: <span className="font-mono">{t.industry_average}</span>
+                        {t.industry_p25 !== null && t.industry_p75 !== null && (
+                          <span className="ml-1">(P25: {t.industry_p25} / P75: {t.industry_p75})</span>
+                        )}
+                      </span>
+                    )}
+                    {t.size_average !== null && (
+                      <span>Taille: <span className="font-mono">{t.size_average}</span>
+                        {t.size_p25 !== null && t.size_p75 !== null && (
+                          <span className="ml-1">(P25: {t.size_p25} / P75: {t.size_p75})</span>
+                        )}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>

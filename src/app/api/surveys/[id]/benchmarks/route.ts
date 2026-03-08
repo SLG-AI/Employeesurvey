@@ -3,13 +3,22 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import benchmarkFallback from "@/lib/benchmarks-template.json";
 
+type BenchmarkDetail = { avg: number; p25: number; p50: number; p75: number };
+
 type ThemeScore = {
   theme_code: string;
   theme_label: string;
   survey_score: number;
   market_average: number;
+  p25: number | null;
+  p50: number | null;
+  p75: number | null;
   industry_average: number | null;
+  industry_p25: number | null;
+  industry_p75: number | null;
   size_average: number | null;
+  size_p25: number | null;
+  size_p75: number | null;
   combined_average: number | null;
   question_count: number;
 };
@@ -18,8 +27,11 @@ type BenchmarkThemeRow = {
   code: string;
   label_fr: string;
   market_average: number;
-  by_industry: Record<string, number>;
-  by_company_size: Record<string, number>;
+  p25: number | null;
+  p50: number | null;
+  p75: number | null;
+  by_industry: Record<string, BenchmarkDetail | number>;
+  by_company_size: Record<string, BenchmarkDetail | number>;
 };
 
 export async function GET(
@@ -67,7 +79,7 @@ export async function GET(
   // Load benchmark reference data from DB, fallback to JSON
   const { data: dbThemes } = await admin
     .from("benchmark_themes")
-    .select("code, label_fr, market_average, by_industry, by_company_size")
+    .select("code, label_fr, market_average, p25, p50, p75, by_industry, by_company_size")
     .order("sort_order");
 
   const benchmarkThemes: BenchmarkThemeRow[] =
@@ -77,8 +89,11 @@ export async function GET(
           code: t.code,
           label_fr: t.label_fr,
           market_average: t.market_average,
-          by_industry: t.by_industry as Record<string, number>,
-          by_company_size: t.by_company_size as Record<string, number>,
+          p25: t.p25 ?? null,
+          p50: t.p50 ?? null,
+          p75: t.p75 ?? null,
+          by_industry: t.by_industry as Record<string, BenchmarkDetail | number>,
+          by_company_size: t.by_company_size as Record<string, BenchmarkDetail | number>,
         }));
 
   // Get societe industry_code and company_size
@@ -163,13 +178,18 @@ export async function GET(
 
     const surveyScore = Math.round((scores.sum / scores.count) * 10) / 10;
 
-    const industryAvg = industryCode
-      ? (benchmarkTheme.by_industry as Record<string, number>)[industryCode] ?? null
-      : null;
+    // Helper to extract avg from new {avg,p25,p50,p75} or old number format
+    const extractDetail = (val: BenchmarkDetail | number | undefined) => {
+      if (val === undefined || val === null) return null;
+      if (typeof val === "number") return { avg: val, p25: null as number | null, p75: null as number | null };
+      return { avg: val.avg, p25: val.p25, p75: val.p75 };
+    };
 
-    const sizeAvg = companySize
-      ? (benchmarkTheme.by_company_size as Record<string, number>)[companySize] ?? null
-      : null;
+    const industryDetail = industryCode ? extractDetail(benchmarkTheme.by_industry[industryCode]) : null;
+    const sizeDetail = companySize ? extractDetail(benchmarkTheme.by_company_size[companySize]) : null;
+
+    const industryAvg = industryDetail?.avg ?? null;
+    const sizeAvg = sizeDetail?.avg ?? null;
 
     const combinedAvg =
       industryAvg !== null && sizeAvg !== null
@@ -181,8 +201,15 @@ export async function GET(
       theme_label: benchmarkTheme.label_fr,
       survey_score: surveyScore,
       market_average: benchmarkTheme.market_average,
+      p25: benchmarkTheme.p25 ?? null,
+      p50: benchmarkTheme.p50 ?? null,
+      p75: benchmarkTheme.p75 ?? null,
       industry_average: industryAvg,
+      industry_p25: industryDetail?.p25 ?? null,
+      industry_p75: industryDetail?.p75 ?? null,
       size_average: sizeAvg,
+      size_p25: sizeDetail?.p25 ?? null,
+      size_p75: sizeDetail?.p75 ?? null,
       combined_average: combinedAvg,
       question_count: scores.count,
     });
