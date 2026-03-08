@@ -637,9 +637,14 @@ export async function seedBenchmarkThemes(): Promise<{ count?: number; error?: s
   const admin = createAdminClient();
 
   // Check if data already exists
-  const { count } = await admin
+  const { count, error: countError } = await admin
     .from("benchmark_themes")
     .select("id", { count: "exact", head: true });
+
+  if (countError) {
+    console.error("[seedBenchmarkThemes] count check error:", countError);
+    return { error: `Erreur lors de la vérification: ${countError.message}` };
+  }
 
   if (count && count > 0) {
     return { error: "Des benchmarks existent déjà. Supprimez-les d'abord pour réimporter." };
@@ -647,6 +652,9 @@ export async function seedBenchmarkThemes(): Promise<{ count?: number; error?: s
 
   // Dynamic import of template data
   const { default: benchmarkTemplate } = await import("@/lib/benchmarks-template.json");
+
+  let inserted_count = 0;
+  const errors: string[] = [];
 
   for (let i = 0; i < benchmarkTemplate.themes.length; i++) {
     const theme = benchmarkTemplate.themes[i];
@@ -665,10 +673,14 @@ export async function seedBenchmarkThemes(): Promise<{ count?: number; error?: s
       .select("id")
       .single();
 
-    if (themeError || !inserted) continue;
+    if (themeError || !inserted) {
+      console.error(`[seedBenchmarkThemes] Failed to insert theme "${theme.code}":`, themeError);
+      errors.push(`${theme.code}: ${themeError?.message || "no data returned"}`);
+      continue;
+    }
 
     if (theme.questions.length > 0) {
-      await admin.from("benchmark_questions").insert(
+      const { error: qError } = await admin.from("benchmark_questions").insert(
         theme.questions.map((q, j) => ({
           theme_id: inserted.id,
           code: q.code,
@@ -678,9 +690,18 @@ export async function seedBenchmarkThemes(): Promise<{ count?: number; error?: s
           sort_order: j,
         }))
       );
+      if (qError) {
+        console.error(`[seedBenchmarkThemes] Failed to insert questions for "${theme.code}":`, qError);
+      }
     }
+
+    inserted_count++;
+  }
+
+  if (inserted_count === 0) {
+    return { error: `Aucun thème importé. Erreurs: ${errors.join("; ")}` };
   }
 
   await logAdminAction(adminUserId, "seed_benchmarks", "benchmark_theme", "all");
-  return { count: benchmarkTemplate.themes.length };
+  return { count: inserted_count };
 }
