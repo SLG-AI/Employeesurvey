@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Pencil, Trash2, Eye, BarChart3, Copy, Clock, CheckCircle2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Eye, BarChart3, Copy, Clock, CheckCircle2, Lock, Loader2 } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -60,6 +60,7 @@ export default function SurveysPage() {
   const [filterSociete, setFilterSociete] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [completionMap, setCompletionMap] = useState<Record<string, CompletionData>>({});
+  const [closingSurvey, setClosingSurvey] = useState<string | null>(null);
   const supabase = createClient();
 
   const loadSurveys = useCallback(async () => {
@@ -82,22 +83,36 @@ export default function SurveysPage() {
       setSurveys(sorted);
 
       // Load completion data for published surveys
-      const publishedIds = sorted.filter((s) => s.status === "published").map((s) => s.id);
-      if (publishedIds.length > 0) {
+      const publishedSurveys = sorted.filter((s) => s.status === "published");
+      if (publishedSurveys.length > 0) {
         const map: Record<string, CompletionData> = {};
         await Promise.all(
-          publishedIds.map(async (id) => {
-            const [tokensRes, responsesRes] = await Promise.all([
-              supabase.from("survey_tokens").select("id", { count: "exact", head: true }).eq("survey_id", id),
-              supabase.from("responses").select("id", { count: "exact", head: true }).eq("survey_id", id),
-            ]);
-            const totalTokens = tokensRes.count ?? 0;
-            const totalResponses = responsesRes.count ?? 0;
-            map[id] = {
-              totalTokens,
-              totalResponses,
-              rate: totalTokens > 0 ? Math.round((totalResponses / totalTokens) * 100) : 0,
-            };
+          publishedSurveys.map(async (s) => {
+            if (s.distribution_mode === "open") {
+              const { count: openCount } = await supabase
+                .from("open_responses")
+                .select("id", { count: "exact", head: true })
+                .eq("survey_id", s.id);
+              const totalResponses = openCount ?? 0;
+              const population = s.estimated_population || 0;
+              map[s.id] = {
+                totalTokens: population,
+                totalResponses,
+                rate: population > 0 ? Math.round((totalResponses / population) * 100) : totalResponses > 0 ? 100 : 0,
+              };
+            } else {
+              const [tokensRes, responsesRes] = await Promise.all([
+                supabase.from("survey_tokens").select("id", { count: "exact", head: true }).eq("survey_id", s.id),
+                supabase.from("responses").select("id", { count: "exact", head: true }).eq("survey_id", s.id),
+              ]);
+              const totalTokens = tokensRes.count ?? 0;
+              const totalResponses = responsesRes.count ?? 0;
+              map[s.id] = {
+                totalTokens,
+                totalResponses,
+                rate: totalTokens > 0 ? Math.round((totalResponses / totalTokens) * 100) : 0,
+              };
+            }
           })
         );
         setCompletionMap(map);
@@ -231,6 +246,24 @@ export default function SurveysPage() {
     }
   }
 
+  async function handleClose(survey: Survey) {
+    if (!confirm(`Clôturer le sondage "${survey.title_fr}" ? Il ne sera plus possible d'y répondre.`)) return;
+
+    setClosingSurvey(survey.id);
+    try {
+      const res = await fetch(`/api/surveys/${survey.id}/close`, { method: "POST" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.error || "Erreur lors de la clôture");
+      } else {
+        toast.success("Sondage clôturé. Le matching des benchmarks est en cours.");
+        loadSurveys();
+      }
+    } finally {
+      setClosingSurvey(null);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -358,14 +391,24 @@ export default function SurveysPage() {
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <div className="flex items-center gap-2 min-w-[120px]">
-                              <Progress value={completionMap[survey.id].rate} className="h-2 w-16" />
-                              <span className="text-sm text-muted-foreground whitespace-nowrap">
-                                {completionMap[survey.id].rate}%
-                              </span>
+                              {completionMap[survey.id].totalTokens > 0 ? (
+                                <>
+                                  <Progress value={completionMap[survey.id].rate} className="h-2 w-16" />
+                                  <span className="text-sm text-muted-foreground whitespace-nowrap">
+                                    {completionMap[survey.id].rate}%
+                                  </span>
+                                </>
+                              ) : (
+                                <span className="text-sm text-muted-foreground whitespace-nowrap">
+                                  {completionMap[survey.id].totalResponses} reponse(s)
+                                </span>
+                              )}
                             </div>
                           </TooltipTrigger>
                           <TooltipContent>
-                            {completionMap[survey.id].totalResponses} / {completionMap[survey.id].totalTokens} réponses
+                            {completionMap[survey.id].totalTokens > 0
+                              ? `${completionMap[survey.id].totalResponses} / ${completionMap[survey.id].totalTokens} réponses`
+                              : `${completionMap[survey.id].totalResponses} réponse(s)`}
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
@@ -375,6 +418,27 @@ export default function SurveysPage() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
+                      {survey.status === "published" && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleClose(survey)}
+                                disabled={closingSurvey === survey.id}
+                              >
+                                {closingSurvey === survey.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin text-orange-600" />
+                                ) : (
+                                  <Lock className="h-4 w-4 text-orange-600" />
+                                )}
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Clôturer le sondage</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
                       {survey.status === "closed" && (
                         <Link href={`/surveys/${survey.id}/results`}>
                           <Button variant="ghost" size="icon" title="Voir les resultats">

@@ -9,7 +9,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Loader2, TrendingUp, TrendingDown, Minus, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
 import {
   RadarChart,
   Radar,
@@ -171,6 +173,7 @@ function RadarCard({
 export function BenchmarkTab({ surveyId }: { surveyId: string }) {
   const [data, setData] = useState<BenchmarkData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [triggering, setTriggering] = useState(false);
 
   const loadBenchmarks = useCallback(async () => {
     setLoading(true);
@@ -185,6 +188,28 @@ export function BenchmarkTab({ surveyId }: { surveyId: string }) {
     loadBenchmarks();
   }, [loadBenchmarks]);
 
+  const handleTriggerBenchmarks = async () => {
+    setTriggering(true);
+    try {
+      const res = await fetch(`/api/surveys/${surveyId}/trigger-benchmarks`, {
+        method: "POST",
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        toast.error(json.error || "Erreur lors du matching");
+      } else if (json.count === 0) {
+        toast.info(json.message || "Aucun mapping généré");
+      } else {
+        toast.success(`${json.count} mapping(s) générés`);
+        loadBenchmarks();
+      }
+    } catch {
+      toast.error("Erreur réseau");
+    } finally {
+      setTriggering(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -196,8 +221,27 @@ export function BenchmarkTab({ surveyId }: { surveyId: string }) {
   if (!data?.available) {
     return (
       <Card>
-        <CardContent className="py-8 text-center text-muted-foreground">
-          {data?.message || "Benchmarks non disponibles."}
+        <CardContent className="py-8 text-center space-y-4">
+          <p className="text-muted-foreground">
+            {data?.message || "Benchmarks non disponibles."}
+          </p>
+          <Button
+            variant="outline"
+            onClick={handleTriggerBenchmarks}
+            disabled={triggering}
+          >
+            {triggering ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Matching en cours...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Lancer le matching des benchmarks
+              </>
+            )}
+          </Button>
         </CardContent>
       </Card>
     );

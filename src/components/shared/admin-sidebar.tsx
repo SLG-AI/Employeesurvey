@@ -6,6 +6,7 @@ import {
   Users,
   ScrollText,
   BarChart3,
+  FlaskConical,
   LogOut,
   ArrowLeft,
 } from "lucide-react";
@@ -51,6 +52,11 @@ const navigationItems = [
     title: "Logs d'audit",
     href: "/admin/logs",
     icon: ScrollText,
+  },
+  {
+    title: "Donnees de test",
+    href: "/admin/test-data",
+    icon: FlaskConical,
   },
 ];
 
