@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { isTeamsConfigured } from "@/lib/teams/graph";
+import { isTeamsConfigured, getTeamsMode } from "@/lib/teams/graph";
 
 export async function GET() {
   const supabase = await createClient();
@@ -12,5 +12,8 @@ export async function GET() {
     return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
   }
 
-  return NextResponse.json({ configured: isTeamsConfigured() });
+  return NextResponse.json({
+    configured: isTeamsConfigured(),
+    mode: getTeamsMode(),
+  });
 }

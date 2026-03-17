@@ -1,6 +1,7 @@
 import { generateTeamsMessage, type TeamsMessageType } from "./templates";
+import { isBotConfigured, sendBotMessages } from "./bot";
 
-const BATCH_SIZE = 20; // Graph API is more rate-limited than email
+const BATCH_SIZE = 20;
 
 export interface TeamsRecipient {
   email: string;
@@ -11,16 +12,40 @@ export interface TeamsRecipient {
 export interface SendTeamsResult {
   sent: number;
   failed: number;
+  notInstalled?: number;
   errors: Array<{ email: string; error: string }>;
 }
 
+/**
+ * Teams is considered configured if either:
+ * - The centralized bot is configured (preferred), OR
+ * - The legacy per-tenant Azure credentials are set
+ */
 export function isTeamsConfigured(): boolean {
+  if (isBotConfigured()) return true;
   return !!(
     process.env.AZURE_TENANT_ID &&
     process.env.AZURE_CLIENT_ID &&
     process.env.AZURE_CLIENT_SECRET
   );
 }
+
+/**
+ * Returns the Teams delivery mode: "bot" or "legacy" or null.
+ */
+export function getTeamsMode(): "bot" | "legacy" | null {
+  if (isBotConfigured()) return "bot";
+  if (
+    process.env.AZURE_TENANT_ID &&
+    process.env.AZURE_CLIENT_ID &&
+    process.env.AZURE_CLIENT_SECRET
+  ) {
+    return "legacy";
+  }
+  return null;
+}
+
+// ── Legacy Graph API approach (per-tenant credentials) ──
 
 async function getAccessToken(): Promise<string> {
   const tenantId = process.env.AZURE_TENANT_ID!;
@@ -56,7 +81,6 @@ async function sendChatMessage(
   userEmail: string,
   message: string
 ): Promise<void> {
-  // Step 1: Create a 1:1 chat with the user
   const chatResponse = await fetch("https://graph.microsoft.com/v1.0/chats", {
     method: "POST",
     headers: {
@@ -87,7 +111,6 @@ async function sendChatMessage(
 
   const chat = await chatResponse.json();
 
-  // Step 2: Send message in the chat
   const messageResponse = await fetch(
     `https://graph.microsoft.com/v1.0/chats/${chat.id}/messages`,
     {
@@ -111,24 +134,12 @@ async function sendChatMessage(
   }
 }
 
-export async function sendTeamsMessages(
+async function sendLegacyMessages(
   recipients: TeamsRecipient[],
   surveyTitle: string,
-  type: TeamsMessageType = "invitation"
+  type: TeamsMessageType
 ): Promise<SendTeamsResult> {
-  const result: SendTeamsResult = {
-    sent: 0,
-    failed: 0,
-    errors: [],
-  };
-
-  if (recipients.length === 0) {
-    return result;
-  }
-
-  if (!isTeamsConfigured()) {
-    throw new Error("Microsoft Teams n'est pas configuré. Veuillez définir AZURE_TENANT_ID, AZURE_CLIENT_ID et AZURE_CLIENT_SECRET.");
-  }
+  const result: SendTeamsResult = { sent: 0, failed: 0, errors: [] };
 
   let accessToken: string;
   try {
@@ -138,11 +149,9 @@ export async function sendTeamsMessages(
     throw new Error(`Impossible de se connecter à Microsoft Graph: ${msg}`);
   }
 
-  // Process in batches
   for (let i = 0; i < recipients.length; i += BATCH_SIZE) {
     const batch = recipients.slice(i, i + BATCH_SIZE);
 
-    // Send messages sequentially within a batch to respect rate limits
     for (const recipient of batch) {
       try {
         const message = generateTeamsMessage(type, {
@@ -162,11 +171,41 @@ export async function sendTeamsMessages(
       }
     }
 
-    // Small delay between batches to respect rate limits
     if (i + BATCH_SIZE < recipients.length) {
       await new Promise((resolve) => setTimeout(resolve, 1000));
     }
   }
 
   return result;
+}
+
+// ── Main entry point ──
+
+/**
+ * Send Teams messages using the best available method:
+ * 1. Bot Framework (proactive messaging) — if TEAMS_BOT_APP_ID is set
+ * 2. Legacy Graph API (per-tenant credentials) — fallback
+ */
+export async function sendTeamsMessages(
+  recipients: TeamsRecipient[],
+  surveyTitle: string,
+  type: TeamsMessageType = "invitation"
+): Promise<SendTeamsResult> {
+  if (recipients.length === 0) {
+    return { sent: 0, failed: 0, errors: [] };
+  }
+
+  if (!isTeamsConfigured()) {
+    throw new Error(
+      "Microsoft Teams n'est pas configuré. Veuillez configurer le bot Teams (TEAMS_BOT_APP_ID) ou les credentials Azure (AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET)."
+    );
+  }
+
+  // Prefer bot approach
+  if (isBotConfigured()) {
+    return sendBotMessages(recipients, surveyTitle, type);
+  }
+
+  // Fallback to legacy
+  return sendLegacyMessages(recipients, surveyTitle, type);
 }

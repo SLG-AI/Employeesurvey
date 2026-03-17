@@ -56,12 +56,29 @@ export async function POST(
     filters.societe_ids = [survey.societe_id];
   }
 
+  // Check for manual selection in request body
+  let manualTokenIds: string[] | null = null;
+  try {
+    const body = await request.json();
+    if (body.selected_token_ids && Array.isArray(body.selected_token_ids)) {
+      manualTokenIds = body.selected_token_ids;
+    }
+  } catch {
+    // No body or invalid JSON — use filter-based selection
+  }
+
   try {
     // Get filtered tokens
     let selectedTokens = await getFilteredTokens(admin, filters);
 
-    // For pulse surveys, apply sampling
-    if (survey.survey_type === "pulse" && survey.sample_percentage) {
+    // If manual selection provided, keep only those IDs
+    if (manualTokenIds) {
+      const idSet = new Set(manualTokenIds);
+      selectedTokens = selectedTokens.filter((t) => idSet.has(t.id));
+    }
+
+    // For pulse surveys, apply sampling (only if no manual selection)
+    if (!manualTokenIds && survey.survey_type === "pulse" && survey.sample_percentage) {
       selectedTokens = sampleTokens(selectedTokens, Number(survey.sample_percentage));
     }
 

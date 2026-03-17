@@ -47,12 +47,14 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   type DistributionMode,
   type SelfDeclarationField,
+  type SurveyFilters,
   SELF_DECLARATION_FIELDS,
   SELF_DECLARATION_LABELS,
 } from "@/lib/types";
 import { toast } from "sonner";
 import Link from "next/link";
 import QRCode from "qrcode";
+import FilterPanel from "@/components/survey-filters/filter-panel";
 
 type TokenInfo = {
   id: string;
@@ -101,6 +103,23 @@ export default function DistributePage() {
   const [sendingTeamsReminders, setSendingTeamsReminders] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
+  const [distributionFilters, setDistributionFilters] = useState<SurveyFilters>({});
+  const [previewEmployees, setPreviewEmployees] = useState<{
+    id: string;
+    employee_name: string | null;
+    email: string | null;
+    fonction: string | null;
+    societe_name: string | null;
+    direction_name: string | null;
+    department_name: string | null;
+    service_name: string | null;
+    lieu_travail: string | null;
+  }[]>([]);
+  const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<Set<string>>(new Set());
+  const [loadingPreview, setLoadingPreview] = useState(false);
+  const [previewLoaded, setPreviewLoaded] = useState(false);
+  const [employeeSearch, setEmployeeSearch] = useState("");
+  const [applyingSelection, setApplyingSelection] = useState(false);
   const [syncResult, setSyncResult] = useState<{
     totalTokens: number;
     newForEmail: number;
@@ -120,7 +139,10 @@ export default function DistributePage() {
       .eq("id", surveyId)
       .single();
 
-    if (surveyData) setSurvey(surveyData);
+    if (surveyData) {
+      setSurvey(surveyData);
+      setDistributionFilters((surveyData.filters as SurveyFilters) || {});
+    }
 
     // Check if survey_tokens exist for this survey
     const { count: stCount } = await supabase
@@ -575,6 +597,97 @@ export default function DistributePage() {
     setRegenerating(false);
   }
 
+  async function handleFiltersChange(newFilters: SurveyFilters) {
+    setDistributionFilters(newFilters);
+    // Save filters to DB
+    const { error } = await supabase
+      .from("surveys")
+      .update({ filters: newFilters })
+      .eq("id", surveyId);
+    if (error) {
+      toast.error("Erreur lors de la sauvegarde des filtres");
+      return;
+    }
+    setSurvey((prev) => prev ? { ...prev, filters: newFilters } : prev);
+    // Load employee preview
+    await loadEmployeePreview(newFilters);
+  }
+
+  async function loadEmployeePreview(filters: SurveyFilters) {
+    setLoadingPreview(true);
+    try {
+      const res = await fetch("/api/surveys/preview-employees", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filters }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPreviewEmployees(data.employees);
+        setSelectedEmployeeIds(new Set(data.employees.map((e: { id: string }) => e.id)));
+        setPreviewLoaded(true);
+      } else {
+        toast.error("Erreur lors du chargement de la prévisualisation");
+      }
+    } catch {
+      toast.error("Erreur réseau");
+    }
+    setLoadingPreview(false);
+  }
+
+  async function applyEmployeeSelection() {
+    setApplyingSelection(true);
+    try {
+      const res = await fetch(`/api/surveys/${surveyId}/generate-tokens`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ selected_token_ids: Array.from(selectedEmployeeIds) }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(`Population mise à jour : ${data.inserted} personne(s)`);
+        setPreviewLoaded(false);
+        setPreviewEmployees([]);
+        await loadData();
+      } else {
+        toast.error(data.error || "Erreur lors de la mise à jour");
+      }
+    } catch {
+      toast.error("Erreur réseau");
+    }
+    setApplyingSelection(false);
+  }
+
+  function toggleEmployee(id: string) {
+    setSelectedEmployeeIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function selectAllEmployees() {
+    setSelectedEmployeeIds(new Set(filteredPreviewEmployees.map((e) => e.id)));
+  }
+
+  function deselectAllEmployees() {
+    setSelectedEmployeeIds(new Set());
+  }
+
+  const filteredPreviewEmployees = previewEmployees.filter((e) => {
+    if (!employeeSearch) return true;
+    const search = employeeSearch.toLowerCase();
+    return (
+      (e.employee_name && e.employee_name.toLowerCase().includes(search)) ||
+      (e.email && e.email.toLowerCase().includes(search)) ||
+      (e.fonction && e.fonction.toLowerCase().includes(search)) ||
+      (e.direction_name && e.direction_name.toLowerCase().includes(search)) ||
+      (e.department_name && e.department_name.toLowerCase().includes(search)) ||
+      (e.service_name && e.service_name.toLowerCase().includes(search))
+    );
+  });
+
   function updateDistributionMode(mode: DistributionMode) {
     setSurvey((prev) => prev ? { ...prev, distribution_mode: mode } : prev);
   }
@@ -871,6 +984,155 @@ export default function DistributePage() {
       {/* ── Token-only sections ── */}
       {survey?.distribution_mode !== "open" && (
       <>
+      {/* Filtres de population */}
+      <FilterPanel
+        societeIds={distributionFilters.societe_ids || (survey?.societe_id ? [survey.societe_id] : [])}
+        filters={distributionFilters}
+        onFiltersChange={handleFiltersChange}
+      />
+
+      {/* Load preview button */}
+      {!previewLoaded && !loadingPreview && (
+        <Button
+          variant="outline"
+          onClick={() => loadEmployeePreview(distributionFilters)}
+          disabled={loadingPreview}
+        >
+          <Users className="mr-2 h-4 w-4" />
+          Voir / sélectionner les employés
+        </Button>
+      )}
+
+      {/* Employee preview & selection */}
+      {(loadingPreview || previewLoaded) && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between text-base">
+              <div className="flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                Employés correspondants
+                {previewLoaded && (
+                  <Badge variant="secondary" className="text-xs">
+                    {selectedEmployeeIds.size} / {previewEmployees.length} sélectionné(s)
+                  </Badge>
+                )}
+              </div>
+              {previewLoaded && (
+                <div className="flex items-center gap-2">
+                  <Button variant="ghost" size="sm" onClick={selectAllEmployees}>
+                    Tout sélectionner
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={deselectAllEmployees}>
+                    Tout désélectionner
+                  </Button>
+                </div>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {loadingPreview ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Chargement des employés...
+              </div>
+            ) : (
+              <>
+                <Input
+                  placeholder="Rechercher par nom, email, fonction, direction..."
+                  value={employeeSearch}
+                  onChange={(e) => setEmployeeSearch(e.target.value)}
+                />
+                <div className="max-h-96 overflow-y-auto rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-10">
+                          <Checkbox
+                            checked={filteredPreviewEmployees.length > 0 && filteredPreviewEmployees.every((e) => selectedEmployeeIds.has(e.id))}
+                            onCheckedChange={(checked) => {
+                              setSelectedEmployeeIds((prev) => {
+                                const next = new Set(prev);
+                                for (const e of filteredPreviewEmployees) {
+                                  if (checked) next.add(e.id);
+                                  else next.delete(e.id);
+                                }
+                                return next;
+                              });
+                            }}
+                          />
+                        </TableHead>
+                        <TableHead>Nom</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Fonction</TableHead>
+                        <TableHead>Direction</TableHead>
+                        <TableHead>Département</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredPreviewEmployees.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                            {employeeSearch ? "Aucun résultat pour cette recherche" : "Aucun employé trouvé avec ces filtres"}
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        filteredPreviewEmployees.map((emp) => (
+                          <TableRow
+                            key={emp.id}
+                            className="cursor-pointer hover:bg-muted/50"
+                            onClick={() => toggleEmployee(emp.id)}
+                          >
+                            <TableCell onClick={(e) => e.stopPropagation()}>
+                              <Checkbox
+                                checked={selectedEmployeeIds.has(emp.id)}
+                                onCheckedChange={() => toggleEmployee(emp.id)}
+                              />
+                            </TableCell>
+                            <TableCell className="font-medium">
+                              {emp.employee_name || "—"}
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {emp.email || "—"}
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              {emp.fonction || "—"}
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              {emp.direction_name || "—"}
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              {emp.department_name || "—"}
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-muted-foreground">
+                    {selectedEmployeeIds.size} employé(s) sélectionné(s) sur {previewEmployees.length}
+                  </p>
+                  <Button onClick={applyEmployeeSelection} disabled={applyingSelection || selectedEmployeeIds.size === 0}>
+                    {applyingSelection ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Application...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="mr-2 h-4 w-4" />
+                        Appliquer la sélection ({selectedEmployeeIds.size})
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Sync from Structure */}
       <Card>
         <CardHeader>

@@ -1,0 +1,46 @@
+{
+  "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.17/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.17",
+  "version": "1.0.0",
+  "id": "{{TEAMS_BOT_APP_ID}}",
+  "developer": {
+    "name": "PulseSurvey",
+    "websiteUrl": "https://pulsesurvey.app",
+    "privacyUrl": "https://pulsesurvey.app/privacy",
+    "termsOfUseUrl": "https://pulsesurvey.app/terms"
+  },
+  "name": {
+    "short": "PulseSurvey",
+    "full": "PulseSurvey - Enquêtes employés"
+  },
+  "description": {
+    "short": "Recevez des invitations à participer aux enquêtes employés",
+    "full": "PulseSurvey vous envoie des notifications lorsqu'un nouveau sondage est disponible. Vos réponses sont totalement anonymes."
+  },
+  "icons": {
+    "outline": "outline.png",
+    "color": "color.png"
+  },
+  "accentColor": "#4F46E5",
+  "bots": [
+    {
+      "botId": "{{TEAMS_BOT_APP_ID}}",
+      "scopes": ["personal"],
+      "supportsFiles": false,
+      "isNotificationOnly": false,
+      "commandLists": [
+        {
+          "scopes": ["personal"],
+          "commands": [
+            {
+              "title": "aide",
+              "description": "Obtenir de l'aide"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "permissions": ["identity", "messageTeamMembers"],
+  "validDomains": []
+}
