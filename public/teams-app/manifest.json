@@ -2,7 +2,7 @@
   "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.17/MicrosoftTeams.schema.json",
   "manifestVersion": "1.17",
   "version": "1.0.0",
-  "id": "{{TEAMS_BOT_APP_ID}}",
+  "id": "478e9d1c-39e1-4a6b-8b9a-0003135f2b47",
   "developer": {
     "name": "PulseSurvey",
     "websiteUrl": "https://pulsesurvey.app",
@@ -24,7 +24,7 @@
   "accentColor": "#4F46E5",
   "bots": [
     {
-      "botId": "{{TEAMS_BOT_APP_ID}}",
+      "botId": "478e9d1c-39e1-4a6b-8b9a-0003135f2b47",
       "scopes": ["personal"],
       "supportsFiles": false,
       "isNotificationOnly": false,
