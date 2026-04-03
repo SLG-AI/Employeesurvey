@@ -39,10 +39,54 @@ async function getBotAccessToken(): Promise<string> {
 /**
  * Store or update a conversation reference when the bot is installed for a user.
  */
+/**
+ * Resolve a user's email from Azure AD via Microsoft Graph.
+ * Requires AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, and the user's tenant ID.
+ */
+async function resolveEmailFromGraph(
+  userAadId: string,
+  tenantId: string
+): Promise<string> {
+  const clientId = process.env.AZURE_CLIENT_ID;
+  const clientSecret = process.env.AZURE_CLIENT_SECRET;
+  if (!clientId || !clientSecret || !tenantId) return "";
+
+  const tokenResponse = await fetch(
+    `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        scope: "https://graph.microsoft.com/.default",
+        grant_type: "client_credentials",
+      }).toString(),
+    }
+  );
+
+  if (!tokenResponse.ok) return "";
+
+  const tokenData = await tokenResponse.json();
+  const accessToken = tokenData.access_token;
+
+  const userResponse = await fetch(
+    `https://graph.microsoft.com/v1.0/users/${userAadId}?$select=mail,userPrincipalName`,
+    {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    }
+  );
+
+  if (!userResponse.ok) return "";
+
+  const userData = await userResponse.json();
+  return userData.mail || userData.userPrincipalName || "";
+}
+
 export async function saveInstallation(activity: BotActivity) {
   const admin = createAdminClient();
 
-  const userEmail =
+  let userEmail =
     activity.from?.email ||
     activity.members?.[0]?.email ||
     activity.from?.userPrincipalName ||
@@ -57,6 +101,15 @@ export async function saveInstallation(activity: BotActivity) {
   if (!userAadId) return;
 
   const azureTenantId = activity.channelData?.tenant?.id || activity.conversation?.tenantId || "";
+
+  // If email is missing, resolve it from Microsoft Graph
+  if (!userEmail && userAadId && azureTenantId) {
+    try {
+      userEmail = await resolveEmailFromGraph(userAadId, azureTenantId);
+    } catch {
+      console.error("[Teams Bot] Failed to resolve email for", userAadId);
+    }
+  }
 
   await admin.from("teams_bot_installations").upsert(
     {
