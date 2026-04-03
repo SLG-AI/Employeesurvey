@@ -1494,25 +1494,23 @@ export default function DistributePage() {
                   )}
                 </Button>
 
-                {teamsStats.invited > 0 && (
-                  <Button
-                    onClick={() => {
-                      if (confirm("Renvoyer les notifications Teams à tous les destinataires, y compris ceux déjà notifiés ?")) {
-                        sendTeamsInvitations(true);
-                      }
-                    }}
-                    disabled={
-                      sendingTeamsInvitations ||
-                      teamsStats.total === 0 ||
-                      survey?.status !== "published"
+                <Button
+                  onClick={() => {
+                    if (confirm("Envoyer les notifications Teams à tous les destinataires, y compris ceux déjà notifiés ?")) {
+                      sendTeamsInvitations(true);
                     }
-                    variant="outline"
-                    title="Renvoyer à tous les destinataires, même ceux déjà notifiés"
-                  >
-                    <RefreshCw className="mr-2 h-4 w-4" />
-                    Renvoyer à tous
-                  </Button>
-                )}
+                  }}
+                  disabled={
+                    sendingTeamsInvitations ||
+                    teamsStats.total === 0 ||
+                    survey?.status !== "published"
+                  }
+                  variant="outline"
+                  title="Envoyer à tous les destinataires, même ceux déjà notifiés"
+                >
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Renvoyer à tous
+                </Button>
 
                 <Button
                   onClick={sendTeamsReminders}
