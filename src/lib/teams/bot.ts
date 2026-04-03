@@ -165,12 +165,6 @@ async function sendProactiveMessage(
 ): Promise<void> {
   const accessToken = await getBotAccessToken();
 
-  // Convert markdown-like formatting to HTML
-  const htmlContent = message
-    .replace(/\n/g, "<br>")
-    .replace(/\*\*(.*?)\*\*/g, "<b>$1</b>")
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
-
   const url = `${serviceUrl.replace(/\/$/, "")}/v3/conversations/${encodeURIComponent(conversationId)}/activities`;
 
   const response = await fetch(url, {
@@ -181,8 +175,8 @@ async function sendProactiveMessage(
     },
     body: JSON.stringify({
       type: "message",
-      textFormat: "html",
-      text: htmlContent,
+      textFormat: "markdown",
+      text: message,
     }),
   });
 
