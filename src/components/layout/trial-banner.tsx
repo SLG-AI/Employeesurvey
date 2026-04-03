@@ -19,6 +19,15 @@ export function TrialBanner() {
 
         if (!user) return;
 
+        // Platform admins don't need subscriptions
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("is_platform_admin")
+          .eq("id", user.id)
+          .single();
+
+        if (profile?.is_platform_admin) return;
+
         // Get tenant membership
         const { data: membership } = await supabase
           .from("tenant_members")

@@ -50,21 +50,27 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Admin routes: check is_platform_admin
-  if (pathname.startsWith("/admin")) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("is_platform_admin")
-      .eq("id", user.id)
-      .single();
+  // Check if user is a platform admin
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("is_platform_admin")
+    .eq("id", user.id)
+    .single();
 
-    if (!profile?.is_platform_admin) {
+  const isPlatformAdmin = !!profile?.is_platform_admin;
+
+  // Admin routes: restrict to platform admins only
+  if (pathname.startsWith("/admin")) {
+    if (!isPlatformAdmin) {
       const url = request.nextUrl.clone();
       url.pathname = "/dashboard";
       return NextResponse.redirect(url);
     }
+    return supabaseResponse;
+  }
 
-    // Platform admins skip tenant/subscription checks for /admin routes
+  // Platform admins bypass tenant/subscription checks on all routes
+  if (isPlatformAdmin) {
     return supabaseResponse;
   }
 

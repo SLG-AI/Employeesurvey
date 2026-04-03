@@ -11,6 +11,7 @@ export interface SubscriptionData {
   membership: TenantMember;
   planName: string;
   maxEmployees: number;
+  isPlatformAdmin: boolean;
 }
 
 export async function getSubscriptionData(): Promise<{
@@ -28,6 +29,15 @@ export async function getSubscriptionData(): Promise<{
     if (userError || !user) {
       return { error: "Utilisateur non authentifie." };
     }
+
+    // Check if platform admin
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("is_platform_admin")
+      .eq("id", user.id)
+      .single();
+
+    const isPlatformAdmin = !!profile?.is_platform_admin;
 
     // Get tenant membership
     const { data: membership, error: memberError } = await supabase
@@ -73,6 +83,7 @@ export async function getSubscriptionData(): Promise<{
         membership,
         planName,
         maxEmployees,
+        isPlatformAdmin,
       },
     };
   } catch (error) {

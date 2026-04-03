@@ -132,7 +132,7 @@ function BillingContent() {
   const isTrialExpired =
     data?.subscription?.status === "trialing" && trialDaysRemaining === 0;
   const isCanceled = data?.subscription?.status === "canceled";
-  const needsSubscription = isTrialExpired || isCanceled;
+  const needsSubscription = (isTrialExpired || isCanceled) && !data?.isPlatformAdmin;
 
   if (loading) {
     return (
