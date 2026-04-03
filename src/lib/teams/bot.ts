@@ -165,7 +165,53 @@ async function sendProactiveMessage(
 ): Promise<void> {
   const accessToken = await getBotAccessToken();
 
+  // Parse the markdown message to extract link and build an Adaptive Card
+  const linkMatch = message.match(/\[([^\]]+)\]\(([^)]+)\)/);
+  const linkText = linkMatch ? linkMatch[1] : "Ouvrir";
+  const linkUrl = linkMatch ? linkMatch[2] : "";
+
+  // Remove the markdown link from the text body
+  const bodyText = message
+    .replace(/👉\s*\[([^\]]+)\]\([^)]+\)\n*/g, "")
+    .replace(/---\n?/g, "")
+    .replace(/\*\*(.*?)\*\*/g, "$1")
+    .trim();
+
+  const lines = bodyText.split("\n").filter((l) => l.trim());
+
   const url = `${serviceUrl.replace(/\/$/, "")}/v3/conversations/${encodeURIComponent(conversationId)}/activities`;
+
+  const adaptiveCard = {
+    type: "message",
+    attachments: [
+      {
+        contentType: "application/vnd.microsoft.card.adaptive",
+        content: {
+          $schema: "http://adaptivecards.io/schemas/adaptive-card.json",
+          type: "AdaptiveCard",
+          version: "1.4",
+          body: lines.map((line) => ({
+            type: "TextBlock",
+            text: line,
+            wrap: true,
+            ...(line.includes("anonymat") || line.includes("🔒")
+              ? { size: "Small", isSubtle: true }
+              : {}),
+          })),
+          actions: linkUrl
+            ? [
+                {
+                  type: "Action.OpenUrl",
+                  title: `👉 ${linkText}`,
+                  url: linkUrl,
+                  style: "positive",
+                },
+              ]
+            : [],
+        },
+      },
+    ],
+  };
 
   const response = await fetch(url, {
     method: "POST",
@@ -173,11 +219,7 @@ async function sendProactiveMessage(
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      type: "message",
-      textFormat: "markdown",
-      text: message,
-    }),
+    body: JSON.stringify(adaptiveCard),
   });
 
   if (!response.ok) {
