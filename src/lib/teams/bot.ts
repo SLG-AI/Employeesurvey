@@ -65,7 +65,11 @@ async function resolveEmailFromGraph(
     }
   );
 
-  if (!tokenResponse.ok) return "";
+  if (!tokenResponse.ok) {
+    const err = await tokenResponse.text();
+    console.error("[Teams Bot] Graph token error:", tokenResponse.status, err);
+    return "";
+  }
 
   const tokenData = await tokenResponse.json();
   const accessToken = tokenData.access_token;
@@ -77,9 +81,14 @@ async function resolveEmailFromGraph(
     }
   );
 
-  if (!userResponse.ok) return "";
+  if (!userResponse.ok) {
+    const err = await userResponse.text();
+    console.error("[Teams Bot] Graph user lookup error:", userResponse.status, err);
+    return "";
+  }
 
   const userData = await userResponse.json();
+  console.log("[Teams Bot] Resolved email for", userAadId, ":", userData.mail || userData.userPrincipalName);
   return userData.mail || userData.userPrincipalName || "";
 }
 
