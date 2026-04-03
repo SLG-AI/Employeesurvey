@@ -152,6 +152,7 @@ export async function POST(
   }));
 
   // Send Teams messages
+  console.log("[Teams Invitations] baseUrl:", baseUrl, "| Sample link:", recipients[0]?.surveyLink);
   console.log("[Teams Invitations] Sending to", recipients.length, "recipients:", recipients.map(r => r.email));
   try {
     const result = await sendTeamsMessages(
