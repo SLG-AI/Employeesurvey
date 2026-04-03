@@ -31,6 +31,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid body" }, { status: 400 });
   }
 
+  console.log("[Teams Bot Webhook] Activity received:", {
+    type: activity.type,
+    action: activity.action,
+    fromEmail: activity.from?.email || activity.from?.userPrincipalName,
+    fromAadId: activity.from?.aadObjectId,
+    conversationId: activity.conversation?.id,
+    serviceUrl: activity.serviceUrl,
+    membersCount: activity.members?.length,
+  });
+
   try {
     switch (activity.type) {
       case "installationUpdate": {
@@ -86,7 +96,7 @@ export async function POST(request: NextRequest) {
       }
     }
   } catch (error) {
-    console.error("Bot webhook error:", error);
+    console.error("[Teams Bot Webhook] Error processing activity:", error);
   }
 
   // Bot Framework expects a 200/201 response
