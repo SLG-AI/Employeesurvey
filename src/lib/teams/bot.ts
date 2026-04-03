@@ -165,46 +165,32 @@ async function sendProactiveMessage(
 ): Promise<void> {
   const accessToken = await getBotAccessToken();
 
-  // Parse the markdown message to extract link and build an Adaptive Card
+  // Parse the markdown message to extract link
   const linkMatch = message.match(/\[([^\]]+)\]\(([^)]+)\)/);
   const linkText = linkMatch ? linkMatch[1] : "Ouvrir";
   const linkUrl = linkMatch ? linkMatch[2] : "";
 
-  // Remove the markdown link from the text body
+  // Remove the markdown link and separator from the text body
   const bodyText = message
     .replace(/👉\s*\[([^\]]+)\]\([^)]+\)\n*/g, "")
     .replace(/---\n?/g, "")
-    .replace(/\*\*(.*?)\*\*/g, "$1")
     .trim();
-
-  const lines = bodyText.split("\n").filter((l) => l.trim());
 
   const url = `${serviceUrl.replace(/\/$/, "")}/v3/conversations/${encodeURIComponent(conversationId)}/activities`;
 
-  const adaptiveCard = {
+  const heroCard = {
     type: "message",
     attachments: [
       {
-        contentType: "application/vnd.microsoft.card.adaptive",
+        contentType: "application/vnd.microsoft.card.hero",
         content: {
-          $schema: "http://adaptivecards.io/schemas/adaptive-card.json",
-          type: "AdaptiveCard",
-          version: "1.4",
-          body: lines.map((line) => ({
-            type: "TextBlock",
-            text: line,
-            wrap: true,
-            ...(line.includes("anonymat") || line.includes("🔒")
-              ? { size: "Small", isSubtle: true }
-              : {}),
-          })),
-          actions: linkUrl
+          text: bodyText,
+          buttons: linkUrl
             ? [
                 {
-                  type: "Action.OpenUrl",
+                  type: "openUrl",
                   title: `👉 ${linkText}`,
-                  url: linkUrl,
-                  style: "positive",
+                  value: linkUrl,
                 },
               ]
             : [],
@@ -219,7 +205,7 @@ async function sendProactiveMessage(
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(adaptiveCard),
+    body: JSON.stringify(heroCard),
   });
 
   if (!response.ok) {

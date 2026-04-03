@@ -42,5 +42,5 @@
     }
   ],
   "permissions": ["identity", "messageTeamMembers"],
-  "validDomains": []
+  "validDomains": ["employeesurvey.netlify.app"]
 }
