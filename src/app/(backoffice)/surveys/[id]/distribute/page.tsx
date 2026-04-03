@@ -470,7 +470,13 @@ export default function DistributePage() {
         if (data.failed > 0) {
           toast.error(`${data.failed} notification(s) Teams échouée(s)`, { duration: 5000 });
         }
-        if (data.sent === 0 && data.failed === 0) {
+        if (data.notInstalled > 0) {
+          toast.warning(
+            `${data.notInstalled} destinataire(s) n'ont pas installé le bot Teams`,
+            { duration: 7000 }
+          );
+        }
+        if (data.sent === 0 && data.failed === 0 && (!data.notInstalled || data.notInstalled === 0)) {
           toast.info(data.message || "Aucune notification à envoyer");
         }
         await loadData();
@@ -499,7 +505,13 @@ export default function DistributePage() {
         if (data.failed > 0) {
           toast.error(`${data.failed} rappel(s) Teams échoué(s)`, { duration: 5000 });
         }
-        if (data.sent === 0 && data.failed === 0) {
+        if (data.notInstalled > 0) {
+          toast.warning(
+            `${data.notInstalled} destinataire(s) n'ont pas installé le bot Teams`,
+            { duration: 7000 }
+          );
+        }
+        if (data.sent === 0 && data.failed === 0 && (!data.notInstalled || data.notInstalled === 0)) {
           toast.info(data.message || "Aucun rappel Teams à envoyer");
         }
         await loadData();

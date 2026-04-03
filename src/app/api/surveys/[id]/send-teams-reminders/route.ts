@@ -195,8 +195,12 @@ export async function POST(
       success: true,
       sent: result.sent,
       failed: result.failed,
+      notInstalled: result.notInstalled || 0,
       total: recipients.length,
       errors: result.errors,
+      ...(result.sent === 0 && result.failed === 0 && (result.notInstalled || 0) > 0
+        ? { message: `Le bot Teams n'est pas installé pour ${result.notInstalled} destinataire(s). Les employés doivent d'abord installer l'application PulseSurvey dans Teams.` }
+        : {}),
     });
   } catch (error) {
     return NextResponse.json(
