@@ -59,6 +59,15 @@ export async function POST(
     );
   }
 
+  // Check for force resend option
+  let body: { force?: boolean } = {};
+  try {
+    body = await request.json();
+  } catch {
+    // No body or invalid JSON — default behavior
+  }
+  const force = body.force === true;
+
   // Check if survey_tokens exist for this survey
   const { count: stCount } = await admin
     .from("survey_tokens")
@@ -69,11 +78,16 @@ export async function POST(
 
   if (stCount && stCount > 0) {
     // New behavior: use survey_tokens
-    const { data: surveyTokensData, error: stError } = await admin
+    let stQuery = admin
       .from("survey_tokens")
       .select("token_id, teams_invitation_sent_at, anonymous_tokens!inner(id, token, email, employee_name)")
-      .eq("survey_id", surveyId)
-      .is("teams_invitation_sent_at", null);
+      .eq("survey_id", surveyId);
+
+    if (!force) {
+      stQuery = stQuery.is("teams_invitation_sent_at", null);
+    }
+
+    const { data: surveyTokensData, error: stError } = await stQuery;
 
     if (stError) {
       return NextResponse.json(
@@ -97,8 +111,11 @@ export async function POST(
       .from("anonymous_tokens")
       .select("id, token, email, employee_name")
       .eq("active", true)
-      .not("email", "is", null)
-      .is("teams_invitation_sent_at", null);
+      .not("email", "is", null);
+
+    if (!force) {
+      tokensQuery = tokensQuery.is("teams_invitation_sent_at", null);
+    }
 
     if (survey.societe_id) {
       tokensQuery = tokensQuery.eq("societe_id", survey.societe_id);

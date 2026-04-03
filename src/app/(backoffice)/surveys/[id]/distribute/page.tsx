@@ -453,11 +453,13 @@ export default function DistributePage() {
     }
   }
 
-  async function sendTeamsInvitations() {
+  async function sendTeamsInvitations(force = false) {
     setSendingTeamsInvitations(true);
     try {
       const response = await fetch(`/api/surveys/${surveyId}/send-teams-invitations`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ force }),
       });
       const data = await response.json();
 
@@ -1471,7 +1473,7 @@ export default function DistributePage() {
               {/* Teams Actions */}
               <div className="flex gap-3">
                 <Button
-                  onClick={sendTeamsInvitations}
+                  onClick={() => sendTeamsInvitations(false)}
                   disabled={
                     sendingTeamsInvitations ||
                     teamsStats.total === 0 ||
@@ -1491,6 +1493,26 @@ export default function DistributePage() {
                     </>
                   )}
                 </Button>
+
+                {teamsStats.invited > 0 && (
+                  <Button
+                    onClick={() => {
+                      if (confirm("Renvoyer les notifications Teams à tous les destinataires, y compris ceux déjà notifiés ?")) {
+                        sendTeamsInvitations(true);
+                      }
+                    }}
+                    disabled={
+                      sendingTeamsInvitations ||
+                      teamsStats.total === 0 ||
+                      survey?.status !== "published"
+                    }
+                    variant="outline"
+                    title="Renvoyer à tous les destinataires, même ceux déjà notifiés"
+                  >
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Renvoyer à tous
+                  </Button>
+                )}
 
                 <Button
                   onClick={sendTeamsReminders}
