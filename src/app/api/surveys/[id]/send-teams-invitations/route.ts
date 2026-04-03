@@ -152,12 +152,14 @@ export async function POST(
   }));
 
   // Send Teams messages
+  console.log("[Teams Invitations] Sending to", recipients.length, "recipients:", recipients.map(r => r.email));
   try {
     const result = await sendTeamsMessages(
       recipients,
       survey.title_fr,
       "invitation"
     );
+    console.log("[Teams Invitations] Result:", { sent: result.sent, failed: result.failed, notInstalled: result.notInstalled, errors: result.errors });
 
     // Update teams_invitation_sent_at for successfully sent tokens
     if (result.sent > 0) {
