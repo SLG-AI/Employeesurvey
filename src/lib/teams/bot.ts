@@ -13,8 +13,9 @@ export function isBotConfigured(): boolean {
  * Uses the Bot Framework token endpoint (not tenant-specific).
  */
 async function getBotAccessToken(): Promise<string> {
+  const tenantId = process.env.AZURE_TENANT_ID || "botframework.com";
   const response = await fetch(
-    "https://login.microsoftonline.com/botframework.com/oauth2/v2.0/token",
+    `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`,
     {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },

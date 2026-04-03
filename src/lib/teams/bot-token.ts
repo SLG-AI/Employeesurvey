@@ -9,8 +9,11 @@ export default async function getBotToken(): Promise<string> {
     return cachedToken.token;
   }
 
+  // Use tenant-specific endpoint for Single Tenant bots,
+  // fallback to botframework.com for Multi Tenant
+  const tenantId = process.env.AZURE_TENANT_ID || "botframework.com";
   const response = await fetch(
-    "https://login.microsoftonline.com/botframework.com/oauth2/v2.0/token",
+    `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`,
     {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
