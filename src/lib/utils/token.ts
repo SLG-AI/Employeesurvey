@@ -16,5 +16,6 @@ export function generateSurveyLink(
   surveyId: string,
   token: string
 ): string {
-  return `${baseUrl}/s/${surveyId}?t=${token}`;
+  const url = baseUrl.startsWith("http") ? baseUrl : `https://${baseUrl}`;
+  return `${url}/s/${surveyId}?t=${token}`;
 }
