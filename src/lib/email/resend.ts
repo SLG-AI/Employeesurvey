@@ -59,12 +59,9 @@ export async function sendSurveyEmails(
         }),
       }));
 
-      console.log(`[Resend] Envoi batch de ${emails.length} emails...`);
       const response = await resend.batch.send(emails);
-      console.log(`[Resend] Réponse:`, JSON.stringify(response, null, 2));
 
       if (response.error) {
-        console.error(`[Resend] Erreur batch:`, response.error);
         result.failed += batch.length;
         for (const recipient of batch) {
           result.errors.push({
