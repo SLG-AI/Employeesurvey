@@ -3,6 +3,17 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendTeamsMessages, isTeamsConfigured } from "@/lib/teams/graph";
 import { generateSurveyLink } from "@/lib/utils/token";
+import {
+  selectRecipients,
+  type SendMode,
+} from "@/lib/surveys/recipient-selector";
+
+const VALID_MODES: SendMode[] = [
+  "non_responders",
+  "never_invited",
+  "manual",
+  "all",
+];
 
 export async function POST(
   request: NextRequest,
@@ -12,17 +23,18 @@ export async function POST(
 
   if (!isTeamsConfigured()) {
     return NextResponse.json(
-      { error: "Microsoft Teams n'est pas configuré. Contactez votre administrateur pour définir les variables AZURE_TENANT_ID, AZURE_CLIENT_ID et AZURE_CLIENT_SECRET." },
+      {
+        error:
+          "Microsoft Teams n'est pas configuré. Contactez votre administrateur pour définir les variables AZURE_TENANT_ID, AZURE_CLIENT_ID et AZURE_CLIENT_SECRET.",
+      },
       { status: 400 }
     );
   }
 
-  // Auth check
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-
   if (!user) {
     return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
   }
@@ -37,11 +49,26 @@ export async function POST(
     return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
   }
 
-  // Get survey details
+  let body: { mode?: string; tokenIds?: unknown } = {};
+  try {
+    body = await request.json();
+  } catch {
+    // Empty body → default (non_responders)
+  }
+
+  const mode: SendMode = VALID_MODES.includes(body.mode as SendMode)
+    ? (body.mode as SendMode)
+    : "non_responders";
+
+  const tokenIds = Array.isArray(body.tokenIds)
+    ? (body.tokenIds as unknown[]).filter((v): v is string => typeof v === "string")
+    : undefined;
+
   const admin = createAdminClient();
+
   const { data: survey, error: surveyError } = await admin
     .from("surveys")
-    .select("title_fr, status, societe_id")
+    .select("title_fr, status")
     .eq("id", surveyId)
     .single();
 
@@ -59,152 +86,105 @@ export async function POST(
     );
   }
 
-  // Check if survey_tokens exist for this survey
-  const { count: stCount } = await admin
-    .from("survey_tokens")
-    .select("id", { count: "exact", head: true })
-    .eq("survey_id", surveyId);
+  const selection = await selectRecipients(admin, {
+    surveyId,
+    mode,
+    tokenIds,
+  });
 
-  let tokens;
-
-  if (stCount && stCount > 0) {
-    // New behavior: use survey_tokens (Teams invited = teams_invitation_sent_at not null)
-    const { data: surveyTokensData, error: stError } = await admin
-      .from("survey_tokens")
-      .select("token_id, teams_invitation_sent_at, anonymous_tokens!inner(id, token, email, employee_name)")
-      .eq("survey_id", surveyId)
-      .not("teams_invitation_sent_at", "is", null);
-
-    if (stError) {
-      return NextResponse.json(
-        { error: "Erreur lors de la récupération des tokens" },
-        { status: 500 }
-      );
-    }
-
-    tokens = (surveyTokensData || [])
-      .filter((st: any) => st.anonymous_tokens?.email)
-      .map((st: any) => ({
-        id: st.anonymous_tokens.id,
-        token: st.anonymous_tokens.token,
-        email: st.anonymous_tokens.email,
-        employee_name: st.anonymous_tokens.employee_name,
-        survey_token_id: st.token_id,
-      }));
-  } else {
-    // Legacy behavior: filter by societe_id
-    let tokensQuery = admin
-      .from("anonymous_tokens")
-      .select("id, token, email, employee_name")
-      .eq("active", true)
-      .not("email", "is", null)
-      .not("teams_invitation_sent_at", "is", null);
-
-    if (survey.societe_id) {
-      tokensQuery = tokensQuery.eq("societe_id", survey.societe_id);
-    }
-
-    const { data, error: tokensError } = await tokensQuery;
-    if (tokensError) {
-      return NextResponse.json(
-        { error: "Erreur lors de la récupération des tokens" },
-        { status: 500 }
-      );
-    }
-    tokens = data || [];
+  if (!selection.ok) {
+    return NextResponse.json(
+      { error: selection.error },
+      { status: selection.status }
+    );
   }
 
-  if (!tokens || tokens.length === 0) {
+  const emailTokens = selection.tokens.filter((t) => !!t.email);
+
+  if (emailTokens.length === 0) {
     return NextResponse.json({
       success: true,
       sent: 0,
       failed: 0,
       total: 0,
-      message: "Aucune invitation Teams envoyée. Envoyez d'abord les invitations.",
+      message: "Aucun destinataire avec email pour ce ciblage",
     });
   }
 
-  // Get responses to filter out those who already responded
-  const { data: responses } = await admin
-    .from("responses")
-    .select("token_id")
-    .eq("survey_id", surveyId);
-
-  const respondedTokenIds = new Set(
-    (responses || []).map((r) => r.token_id)
-  );
-
-  const nonResponders = tokens.filter(
-    (t) => !respondedTokenIds.has(t.id)
-  );
-
-  if (nonResponders.length === 0) {
-    return NextResponse.json({
-      success: true,
-      sent: 0,
-      failed: 0,
-      total: 0,
-      message: "Tous les destinataires ont déjà répondu",
-    });
-  }
-
-  // Prepare recipients
   const baseUrl =
     process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin;
 
-  const recipients = nonResponders.map((t) => ({
+  const recipients = emailTokens.map((t) => ({
     email: t.email!,
     employeeName: t.employee_name || "Collaborateur",
     surveyLink: generateSurveyLink(baseUrl, surveyId, t.token),
   }));
 
-  // Send Teams reminders
+  const messageType = mode === "never_invited" ? "invitation" : "reminder";
+
   try {
     const result = await sendTeamsMessages(
       recipients,
       survey.title_fr,
-      "reminder"
+      messageType
     );
 
-    // Update teams_reminder_sent_at for successfully sent tokens
     if (result.sent > 0) {
       const failedEmails = new Set(result.errors.map((e) => e.email));
-      const successIds = nonResponders
-        .filter((t: any) => !failedEmails.has(t.email!))
-        .map((t: any) => t.id);
+      const successTokens = emailTokens.filter(
+        (t) => !failedEmails.has(t.email!)
+      );
 
-      if (successIds.length > 0) {
-        if (stCount && stCount > 0) {
-          // Update survey_tokens
+      const nowIso = new Date().toISOString();
+      const columnToUpdate =
+        mode === "never_invited"
+          ? "teams_invitation_sent_at"
+          : "teams_reminder_sent_at";
+
+      if (selection.useSurveyTokens) {
+        if (successTokens.length > 0) {
           await admin
             .from("survey_tokens")
-            .update({ teams_reminder_sent_at: new Date().toISOString() })
+            .update({ [columnToUpdate]: nowIso })
             .eq("survey_id", surveyId)
-            .in("token_id", successIds);
-        } else {
-          // Legacy: update anonymous_tokens
-          await admin
-            .from("anonymous_tokens")
-            .update({ teams_reminder_sent_at: new Date().toISOString() })
-            .in("id", successIds);
+            .in(
+              "token_id",
+              successTokens.map((t) => t.id)
+            );
         }
+      } else {
+        await admin
+          .from("anonymous_tokens")
+          .update({ [columnToUpdate]: nowIso })
+          .in(
+            "id",
+            successTokens.map((t) => t.id)
+          );
       }
     }
 
     return NextResponse.json({
       success: true,
+      mode,
       sent: result.sent,
       failed: result.failed,
       notInstalled: result.notInstalled || 0,
       total: recipients.length,
       errors: result.errors,
-      ...(result.sent === 0 && result.failed === 0 && (result.notInstalled || 0) > 0
-        ? { message: `Le bot Teams n'est pas installé pour ${result.notInstalled} destinataire(s). Les employés doivent d'abord installer l'application PulseSurvey dans Teams.` }
+      ...(result.sent === 0 &&
+      result.failed === 0 &&
+      (result.notInstalled || 0) > 0
+        ? {
+            message: `Le bot Teams n'est pas installé pour ${result.notInstalled} destinataire(s). Les employés doivent d'abord installer l'application PulseSurvey dans Teams.`,
+          }
         : {}),
     });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Erreur lors de l'envoi Teams" },
+      {
+        error:
+          error instanceof Error ? error.message : "Erreur lors de l'envoi Teams",
+      },
       { status: 500 }
     );
   }

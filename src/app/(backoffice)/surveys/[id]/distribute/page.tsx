@@ -53,6 +53,7 @@ import {
 } from "@/lib/types";
 import { toast } from "sonner";
 import Link from "next/link";
+import { TargetedSendPanel } from "./_components/targeted-send-panel";
 import QRCode from "qrcode";
 import FilterPanel from "@/components/survey-filters/filter-panel";
 
@@ -1335,6 +1336,14 @@ export default function DistributePage() {
       {/* ── Token-only: Email, Teams, CSV ── */}
       {survey?.distribution_mode !== "open" && (
       <>
+      {/* Targeted send (relances ciblées) */}
+      <TargetedSendPanel
+        surveyId={surveyId}
+        surveyPublished={survey?.status === "published"}
+        teamsConfigured={teamsConfigured === true}
+        onSent={loadData}
+      />
+
       {/* Email Distribution */}
       <Card>
         <CardHeader>

@@ -3,6 +3,17 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendSurveyEmails } from "@/lib/email/resend";
 import { generateSurveyLink } from "@/lib/utils/token";
+import {
+  selectRecipients,
+  type SendMode,
+} from "@/lib/surveys/recipient-selector";
+
+const VALID_MODES: SendMode[] = [
+  "non_responders",
+  "never_invited",
+  "manual",
+  "all",
+];
 
 export async function POST(
   request: NextRequest,
@@ -10,12 +21,10 @@ export async function POST(
 ) {
   const { id: surveyId } = await params;
 
-  // Auth check
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-
   if (!user) {
     return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
   }
@@ -30,11 +39,26 @@ export async function POST(
     return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
   }
 
-  // Get survey details
+  let body: { mode?: string; tokenIds?: unknown } = {};
+  try {
+    body = await request.json();
+  } catch {
+    // Empty body → default "never_invited" (legacy behavior)
+  }
+
+  const mode: SendMode = VALID_MODES.includes(body.mode as SendMode)
+    ? (body.mode as SendMode)
+    : "never_invited";
+
+  const tokenIds = Array.isArray(body.tokenIds)
+    ? (body.tokenIds as unknown[]).filter((v): v is string => typeof v === "string")
+    : undefined;
+
   const admin = createAdminClient();
+
   const { data: survey, error: surveyError } = await admin
     .from("surveys")
-    .select("title_fr, status, societe_id")
+    .select("title_fr, status")
     .eq("id", surveyId)
     .single();
 
@@ -52,115 +76,74 @@ export async function POST(
     );
   }
 
-  // Check if survey_tokens exist for this survey
-  const { count: stCount } = await admin
-    .from("survey_tokens")
-    .select("id", { count: "exact", head: true })
-    .eq("survey_id", surveyId);
+  const selection = await selectRecipients(admin, {
+    surveyId,
+    mode,
+    tokenIds,
+  });
 
-  let uninvitedTokens;
-
-  if (stCount && stCount > 0) {
-    // New behavior: use survey_tokens
-    const { data: surveyTokensData, error: stError } = await admin
-      .from("survey_tokens")
-      .select("token_id, invitation_sent_at, anonymous_tokens!inner(id, token, email, employee_name)")
-      .eq("survey_id", surveyId)
-      .is("invitation_sent_at", null);
-
-    if (stError) {
-      return NextResponse.json(
-        { error: "Erreur lors de la récupération des tokens" },
-        { status: 500 }
-      );
-    }
-
-    uninvitedTokens = (surveyTokensData || [])
-      .filter((st: any) => st.anonymous_tokens?.email)
-      .map((st: any) => ({
-        id: st.anonymous_tokens.id,
-        token: st.anonymous_tokens.token,
-        email: st.anonymous_tokens.email,
-        employee_name: st.anonymous_tokens.employee_name,
-        survey_token_id: st.token_id,
-      }));
-  } else {
-    // Legacy behavior: filter by societe_id
-    let tokensQuery = admin
-      .from("anonymous_tokens")
-      .select("id, token, email, employee_name")
-      .eq("active", true)
-      .not("email", "is", null)
-      .is("invitation_sent_at", null);
-
-    if (survey.societe_id) {
-      tokensQuery = tokensQuery.eq("societe_id", survey.societe_id);
-    }
-
-    const { data, error: tokensError } = await tokensQuery;
-    if (tokensError) {
-      return NextResponse.json(
-        { error: "Erreur lors de la récupération des tokens" },
-        { status: 500 }
-      );
-    }
-    uninvitedTokens = data || [];
+  if (!selection.ok) {
+    return NextResponse.json(
+      { error: selection.error },
+      { status: selection.status }
+    );
   }
 
-  if (!uninvitedTokens || uninvitedTokens.length === 0) {
+  const emailTokens = selection.tokens.filter((t) => !!t.email);
+
+  if (emailTokens.length === 0) {
     return NextResponse.json({
       success: true,
       sent: 0,
       failed: 0,
       total: 0,
-      message: "Toutes les invitations ont déjà été envoyées",
+      message: "Aucun destinataire avec email pour ce ciblage",
     });
   }
 
-  // Prepare recipients
   const baseUrl =
     process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin;
 
-  const recipients = uninvitedTokens.map((t) => ({
+  const recipients = emailTokens.map((t) => ({
     email: t.email!,
     employeeName: t.employee_name || "Collaborateur",
     surveyLink: generateSurveyLink(baseUrl, surveyId, t.token),
   }));
 
-  // Send emails
-  const result = await sendSurveyEmails(
-    recipients,
-    survey.title_fr,
-    "invitation"
-  );
+  // Invitation template for never_invited; reminder template for reinvites
+  const emailType = mode === "never_invited" ? "invitation" : "reminder";
+  const result = await sendSurveyEmails(recipients, survey.title_fr, emailType);
 
-  // Update invitation_sent_at for successfully sent tokens
   if (result.sent > 0) {
     const failedEmails = new Set(result.errors.map((e) => e.email));
-    const successIds = uninvitedTokens
-      .filter((t: any) => !failedEmails.has(t.email!))
-      .map((t: any) => t.id);
+    const successTokens = emailTokens.filter(
+      (t) => !failedEmails.has(t.email!)
+    );
 
-    if (successIds.length > 0) {
-      if (stCount && stCount > 0) {
-        // Update survey_tokens
-        await admin
-          .from("survey_tokens")
-          .update({ invitation_sent_at: new Date().toISOString() })
-          .eq("survey_id", surveyId)
-          .in("token_id", successIds);
-      } else {
-        // Legacy: update anonymous_tokens
-        await admin
-          .from("anonymous_tokens")
-          .update({ invitation_sent_at: new Date().toISOString() })
-          .in("id", successIds);
-      }
+    const nowIso = new Date().toISOString();
+    const columnToUpdate =
+      mode === "never_invited" ? "invitation_sent_at" : "reminder_sent_at";
+
+    if (selection.useSurveyTokens) {
+      await admin
+        .from("survey_tokens")
+        .update({ [columnToUpdate]: nowIso })
+        .eq("survey_id", surveyId)
+        .in("token_id", successTokens.map((t) => t.id));
+    } else {
+      await admin
+        .from("anonymous_tokens")
+        .update({ [columnToUpdate]: nowIso })
+        .in(
+          "id",
+          successTokens.map((t) => t.id)
+        );
     }
   }
 
   return NextResponse.json({
     success: true,
+    mode,
     sent: result.sent,
     failed: result.failed,
     total: recipients.length,
