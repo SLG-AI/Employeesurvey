@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   LogOut,
   Settings,
+  UserPlus,
   Users,
 } from "lucide-react";
 import Link from "next/link";
@@ -37,6 +38,11 @@ const navigationItems = [
     title: "Sondages",
     href: "/surveys",
     icon: ClipboardList,
+  },
+  {
+    title: "Onboarding",
+    href: "/onboarding",
+    icon: UserPlus,
   },
   {
     title: "Mes resultats",

@@ -1,3 +1,19 @@
+export type Onboarding = {
+  id: string;
+  tenant_id: string;
+  slug: string;
+  first_name: string;
+  last_name: string;
+  employee_id: string;
+  job_title: string;
+  start_date: string | null;
+  state: Record<string, unknown>;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  archived_at: string | null;
+};
+
 export type QuestionType =
   | "single_choice"
   | "multiple_choice"
