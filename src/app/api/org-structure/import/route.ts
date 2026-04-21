@@ -183,6 +183,8 @@ export async function POST(request: Request) {
   const formData = await request.formData();
   const file = formData.get("file") as File | null;
   const societeId = formData.get("societe_id") as string | null;
+  const rawMode = formData.get("mode");
+  const mode: "replace" | "append" = rawMode === "append" ? "append" : "replace";
 
   if (!file) {
     return NextResponse.json({ error: "Aucun fichier fourni" }, { status: 400 });
@@ -502,27 +504,33 @@ export async function POST(request: Request) {
     }
   }
 
-  // Deactivate tokens for employees absent from the file (same société)
-  const importedEmployeeIds = employees.map((e) => e.employee_id);
-  const { data: allSocieteTokens } = await admin
-    .from("anonymous_tokens")
-    .select("id, employee_id")
-    .eq("societe_id", societeId)
-    .eq("active", true);
-
-  const tokensToDeactivate = (allSocieteTokens || [])
-    .filter((t) => t.employee_id && !importedEmployeeIds.includes(t.employee_id))
-    .map((t) => t.id);
-
+  // In "replace" mode: deactivate tokens for employees absent from the file.
+  // In "append" mode: leave existing active tokens untouched — only add new ones
+  // and update the ones present in the file.
   let deactivatedCount = 0;
-  if (tokensToDeactivate.length > 0) {
-    const { error: deactivateError } = await admin
+  if (mode === "replace") {
+    const importedEmployeeIds = employees.map((e) => e.employee_id);
+    const { data: allSocieteTokens } = await admin
       .from("anonymous_tokens")
-      .update({ active: false })
-      .in("id", tokensToDeactivate);
+      .select("id, employee_id")
+      .eq("societe_id", societeId)
+      .eq("active", true);
 
-    if (!deactivateError) {
-      deactivatedCount = tokensToDeactivate.length;
+    const tokensToDeactivate = (allSocieteTokens || [])
+      .filter(
+        (t) => t.employee_id && !importedEmployeeIds.includes(t.employee_id)
+      )
+      .map((t) => t.id);
+
+    if (tokensToDeactivate.length > 0) {
+      const { error: deactivateError } = await admin
+        .from("anonymous_tokens")
+        .update({ active: false })
+        .in("id", tokensToDeactivate);
+
+      if (!deactivateError) {
+        deactivatedCount = tokensToDeactivate.length;
+      }
     }
   }
 
@@ -545,6 +553,7 @@ export async function POST(request: Request) {
   return NextResponse.json({
     success: true,
     errors,
+    mode,
     summary: {
       employees: employees.length,
       directions: directions.size,

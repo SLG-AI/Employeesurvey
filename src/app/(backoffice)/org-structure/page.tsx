@@ -114,6 +114,7 @@ export default function OrgStructurePage() {
   const [tokenMappings, setTokenMappings] = useState<TokenMapping[]>([]);
   const [selectedSocieteId, setSelectedSocieteId] = useState<string>("all");
   const [importSocieteId, setImportSocieteId] = useState<string>("");
+  const [importMode, setImportMode] = useState<"replace" | "append">("replace");
   const [quota, setQuota] = useState<QuotaInfo | null>(null);
   const [overageWarning, setOverageWarning] = useState<string | null>(null);
   const supabase = createClient();
@@ -205,6 +206,7 @@ export default function OrgStructurePage() {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("societe_id", importSocieteId);
+    formData.append("mode", importMode);
 
     const res = await fetch("/api/org-structure/import", {
       method: "POST",
@@ -229,8 +231,14 @@ export default function OrgStructurePage() {
       if (data.summary) {
         setSummary(data.summary);
         setTokenMappings(data.tokenMappings || []);
+        const suffix =
+          data.mode === "append"
+            ? " (aucune desactivation)"
+            : data.summary.tokensDeactivated > 0
+              ? ` — ${data.summary.tokensDeactivated} desactives`
+              : "";
         toast.success("Import reussi", {
-          description: `${data.summary.employees} employes traites — ${data.summary.tokens} nouveaux tokens, ${data.summary.tokensUpdated} mis a jour`,
+          description: `${data.summary.employees} employes traites — ${data.summary.tokens} nouveaux, ${data.summary.tokensUpdated} mis a jour${suffix}`,
         });
         loadOrgs();
         loadQuota();
@@ -541,6 +549,64 @@ export default function OrgStructurePage() {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          {/* Import mode selector */}
+          <div className="space-y-2">
+            <Label>Mode d&apos;import *</Label>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => setImportMode("replace")}
+                className={`text-left rounded-lg border p-3 transition ${
+                  importMode === "replace"
+                    ? "border-primary bg-primary/5"
+                    : "border-border hover:bg-muted/50"
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <div
+                    className={`h-4 w-4 rounded-full border-2 ${
+                      importMode === "replace"
+                        ? "border-primary bg-primary"
+                        : "border-muted-foreground"
+                    }`}
+                  />
+                  <span className="font-medium">Remplacer</span>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Met a jour / ajoute les employes du fichier et{" "}
+                  <strong>desactive</strong> ceux de la societe qui n&apos;y
+                  sont pas. A utiliser quand le fichier represente la liste
+                  complete et a jour.
+                </p>
+              </button>
+              <button
+                type="button"
+                onClick={() => setImportMode("append")}
+                className={`text-left rounded-lg border p-3 transition ${
+                  importMode === "append"
+                    ? "border-primary bg-primary/5"
+                    : "border-border hover:bg-muted/50"
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <div
+                    className={`h-4 w-4 rounded-full border-2 ${
+                      importMode === "append"
+                        ? "border-primary bg-primary"
+                        : "border-muted-foreground"
+                    }`}
+                  />
+                  <span className="font-medium">Ajouter</span>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Ajoute les nouveaux employes et met a jour ceux du fichier,
+                  mais <strong>ne desactive personne</strong>. A utiliser pour
+                  un ajout incremental.
+                </p>
+              </button>
+            </div>
           </div>
 
           <div className="flex items-center gap-4">
