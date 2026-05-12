@@ -1,3 +1,5 @@
+import { LIKERT_SCALE_VARIANTS, type QuestionScaleConfig, type ScaleVariant } from "@/lib/types";
+
 export type LanguageCode = "fr" | "en" | "de" | "es" | "it" | "pt" | "ar" | "nl" | "lb" | "sh" | "ro";
 
 export type LanguageInfo = {
@@ -38,6 +40,12 @@ const UI_STRINGS: Record<string, Record<string, string>> = {
     next: "Suivant",
     strongly_disagree: "Pas du tout d'accord",
     strongly_agree: "Tout à fait d'accord",
+    scale_satisfaction_min: "Pas du tout satisfait·e",
+    scale_satisfaction_max: "Très satisfait·e",
+    scale_frequency_min: "Jamais",
+    scale_frequency_max: "Toujours",
+    scale_importance_min: "Pas du tout important",
+    scale_importance_max: "Extrêmement important",
     your_choice: "Votre choix :",
     enter_answer: "Saisissez votre réponse...",
     answered_count: "Vous avez répondu à {answered} question(s) sur {total}.",
@@ -58,6 +66,12 @@ const UI_STRINGS: Record<string, Record<string, string>> = {
     next: "Next",
     strongly_disagree: "Strongly disagree",
     strongly_agree: "Strongly agree",
+    scale_satisfaction_min: "Very dissatisfied",
+    scale_satisfaction_max: "Very satisfied",
+    scale_frequency_min: "Never",
+    scale_frequency_max: "Always",
+    scale_importance_min: "Not at all important",
+    scale_importance_max: "Extremely important",
     your_choice: "Your choice:",
     enter_answer: "Enter your answer...",
     answered_count: "You answered {answered} out of {total} question(s).",
@@ -79,6 +93,12 @@ const UI_STRINGS: Record<string, Record<string, string>> = {
     next: "Weiter",
     strongly_disagree: "Stimme überhaupt nicht zu",
     strongly_agree: "Stimme voll und ganz zu",
+    scale_satisfaction_min: "Sehr unzufrieden",
+    scale_satisfaction_max: "Sehr zufrieden",
+    scale_frequency_min: "Nie",
+    scale_frequency_max: "Immer",
+    scale_importance_min: "Überhaupt nicht wichtig",
+    scale_importance_max: "Äußerst wichtig",
     your_choice: "Ihre Wahl:",
     enter_answer: "Geben Sie Ihre Antwort ein...",
     answered_count:
@@ -101,6 +121,12 @@ const UI_STRINGS: Record<string, Record<string, string>> = {
     next: "Siguiente",
     strongly_disagree: "Totalmente en desacuerdo",
     strongly_agree: "Totalmente de acuerdo",
+    scale_satisfaction_min: "Nada satisfecho/a",
+    scale_satisfaction_max: "Muy satisfecho/a",
+    scale_frequency_min: "Nunca",
+    scale_frequency_max: "Siempre",
+    scale_importance_min: "Nada importante",
+    scale_importance_max: "Extremadamente importante",
     your_choice: "Su elección:",
     enter_answer: "Ingrese su respuesta...",
     answered_count: "Ha respondido {answered} de {total} pregunta(s).",
@@ -122,6 +148,12 @@ const UI_STRINGS: Record<string, Record<string, string>> = {
     next: "Avanti",
     strongly_disagree: "Per niente d'accordo",
     strongly_agree: "Completamente d'accordo",
+    scale_satisfaction_min: "Per niente soddisfatto/a",
+    scale_satisfaction_max: "Molto soddisfatto/a",
+    scale_frequency_min: "Mai",
+    scale_frequency_max: "Sempre",
+    scale_importance_min: "Per niente importante",
+    scale_importance_max: "Estremamente importante",
     your_choice: "La tua scelta:",
     enter_answer: "Inserisci la tua risposta...",
     answered_count: "Hai risposto a {answered} domanda/e su {total}.",
@@ -143,6 +175,12 @@ const UI_STRINGS: Record<string, Record<string, string>> = {
     next: "Seguinte",
     strongly_disagree: "Discordo totalmente",
     strongly_agree: "Concordo totalmente",
+    scale_satisfaction_min: "Nada satisfeito/a",
+    scale_satisfaction_max: "Muito satisfeito/a",
+    scale_frequency_min: "Nunca",
+    scale_frequency_max: "Sempre",
+    scale_importance_min: "Nada importante",
+    scale_importance_max: "Extremamente importante",
     your_choice: "A sua escolha:",
     enter_answer: "Introduza a sua resposta...",
     answered_count: "Respondeu a {answered} de {total} pergunta(s).",
@@ -163,6 +201,12 @@ const UI_STRINGS: Record<string, Record<string, string>> = {
     next: "التالي",
     strongly_disagree: "لا أوافق بشدة",
     strongly_agree: "أوافق بشدة",
+    scale_satisfaction_min: "غير راضٍ إطلاقاً",
+    scale_satisfaction_max: "راضٍ جداً",
+    scale_frequency_min: "أبداً",
+    scale_frequency_max: "دائماً",
+    scale_importance_min: "غير مهم إطلاقاً",
+    scale_importance_max: "مهم للغاية",
     your_choice: "اختيارك:",
     enter_answer: "أدخل إجابتك...",
     answered_count: "لقد أجبت على {answered} من {total} سؤال(أسئلة).",
@@ -184,6 +228,12 @@ const UI_STRINGS: Record<string, Record<string, string>> = {
     next: "Volgende",
     strongly_disagree: "Helemaal oneens",
     strongly_agree: "Helemaal eens",
+    scale_satisfaction_min: "Helemaal niet tevreden",
+    scale_satisfaction_max: "Zeer tevreden",
+    scale_frequency_min: "Nooit",
+    scale_frequency_max: "Altijd",
+    scale_importance_min: "Helemaal niet belangrijk",
+    scale_importance_max: "Uiterst belangrijk",
     your_choice: "Uw keuze:",
     enter_answer: "Voer uw antwoord in...",
     answered_count: "U heeft {answered} van de {total} vra(a)g(en) beantwoord.",
@@ -205,6 +255,12 @@ const UI_STRINGS: Record<string, Record<string, string>> = {
     next: "Weider",
     strongly_disagree: "Guer net averstanen",
     strongly_agree: "Komplett averstanen",
+    scale_satisfaction_min: "Guer net zefridden",
+    scale_satisfaction_max: "Ganz zefridden",
+    scale_frequency_min: "Ni",
+    scale_frequency_max: "Ëmmer",
+    scale_importance_min: "Guer net wichteg",
+    scale_importance_max: "Extrem wichteg",
     your_choice: "Är Wiel:",
     enter_answer: "Gitt Är Äntwert an...",
     answered_count: "Dir hutt {answered} vun {total} Fro(en) beäntwert.",
@@ -226,6 +282,12 @@ const UI_STRINGS: Record<string, Record<string, string>> = {
     next: "Dalje",
     strongly_disagree: "Uopće se ne slažem",
     strongly_agree: "Potpuno se slažem",
+    scale_satisfaction_min: "Uopće nisam zadovoljan/na",
+    scale_satisfaction_max: "Veoma sam zadovoljan/na",
+    scale_frequency_min: "Nikada",
+    scale_frequency_max: "Uvijek",
+    scale_importance_min: "Uopće nije važno",
+    scale_importance_max: "Izuzetno važno",
     your_choice: "Vaš izbor:",
     enter_answer: "Unesite vaš odgovor...",
     answered_count: "Odgovorili ste na {answered} od {total} pitanja.",
@@ -247,6 +309,12 @@ const UI_STRINGS: Record<string, Record<string, string>> = {
     next: "Următorul",
     strongly_disagree: "Total dezacord",
     strongly_agree: "Total de acord",
+    scale_satisfaction_min: "Deloc mulțumit/ă",
+    scale_satisfaction_max: "Foarte mulțumit/ă",
+    scale_frequency_min: "Niciodată",
+    scale_frequency_max: "Întotdeauna",
+    scale_importance_min: "Deloc important",
+    scale_importance_max: "Extrem de important",
     your_choice: "Alegerea dumneavoastră:",
     enter_answer: "Introduceți răspunsul...",
     answered_count: "Ați răspuns la {answered} din {total} întrebare(ări).",
@@ -270,4 +338,42 @@ export function getUIString(
     (s, [k, v]) => s.replace(`{${k}}`, String(v)),
     str
   );
+}
+
+/**
+ * Resolve the min/max anchor labels for a Likert question's "consigne" in the
+ * given respondent language. Preset variants are fully translated; the "custom"
+ * variant uses the admin-typed FR/EN labels (EN only when lang === "en",
+ * otherwise the FR label is used as the fallback for every other language).
+ */
+export function getScaleLabels(
+  lang: string,
+  config: QuestionScaleConfig | null | undefined
+): { min: string; max: string } {
+  const variant = (config?.scale_variant as ScaleVariant) || "agreement";
+
+  if (variant === "custom") {
+    const minFr = config?.scale_min_label_fr?.trim() || "";
+    const minEn = config?.scale_min_label_en?.trim() || "";
+    const maxFr = config?.scale_max_label_fr?.trim() || "";
+    const maxEn = config?.scale_max_label_en?.trim() || "";
+    return {
+      min:
+        (lang === "en" ? minEn : "") ||
+        minFr ||
+        getUIString(lang, "strongly_disagree"),
+      max:
+        (lang === "en" ? maxEn : "") ||
+        maxFr ||
+        getUIString(lang, "strongly_agree"),
+    };
+  }
+
+  const cfg =
+    LIKERT_SCALE_VARIANTS[variant as Exclude<ScaleVariant, "custom">] ||
+    LIKERT_SCALE_VARIANTS.agreement;
+  return {
+    min: getUIString(lang, cfg.minKey),
+    max: getUIString(lang, cfg.maxKey),
+  };
 }

@@ -16,8 +16,13 @@ import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { GripVertical, Trash2, Plus, X } from "lucide-react";
-import type { QuestionType } from "@/lib/types";
-import { QUESTION_TYPE_LABELS } from "@/lib/types";
+import type { QuestionType, ScaleVariant } from "@/lib/types";
+import {
+  QUESTION_TYPE_LABELS,
+  SCALE_VARIANT_LABELS,
+  SCALE_VARIANT_ORDER,
+} from "@/lib/types";
+import { getScaleLabels } from "@/lib/utils/languages";
 
 export type EditableQuestion = {
   id: string;
@@ -27,7 +32,16 @@ export type EditableQuestion = {
   question_code: string;
   required: boolean;
   options: EditableOption[];
+  // "Consigne" for Likert scales
+  scaleVariant: ScaleVariant;
+  scaleMinFr: string;
+  scaleMinEn: string;
+  scaleMaxFr: string;
+  scaleMaxEn: string;
 };
+
+const lowerFirst = (s: string) =>
+  s ? s.charAt(0).toLowerCase() + s.slice(1) : s;
 
 export type EditableOption = {
   id: string;
@@ -67,6 +81,17 @@ export function QuestionCard({
 
   const hasOptions =
     question.type === "single_choice" || question.type === "multiple_choice";
+  const isLikert = question.type === "likert" || question.type === "likert_5";
+  const scaleVariant: ScaleVariant = question.scaleVariant || "agreement";
+  const isCustomScale = scaleVariant === "custom";
+  const scaleMax = question.type === "likert_5" ? 5 : 10;
+  const scaleLabelsFr = getScaleLabels("fr", {
+    scale_variant: scaleVariant,
+    scale_min_label_fr: question.scaleMinFr,
+    scale_min_label_en: question.scaleMinEn,
+    scale_max_label_fr: question.scaleMaxFr,
+    scale_max_label_en: question.scaleMaxEn,
+  });
 
   function updateField(field: keyof EditableQuestion, value: string | boolean) {
     const updated = { ...question, [field]: value };
@@ -89,7 +114,27 @@ export function QuestionCard({
         { id: crypto.randomUUID(), text_fr: "", text_en: "" },
       ];
     }
+    // Ensure a valid scale variant when switching to a Likert type
+    if (
+      field === "type" &&
+      (value === "likert" || value === "likert_5") &&
+      !updated.scaleVariant
+    ) {
+      updated.scaleVariant = "agreement";
+    }
     onChange(updated);
+  }
+
+  function updateScaleField(
+    field:
+      | "scaleVariant"
+      | "scaleMinFr"
+      | "scaleMinEn"
+      | "scaleMaxFr"
+      | "scaleMaxEn",
+    value: string
+  ) {
+    onChange({ ...question, [field]: value });
   }
 
   function addOption() {
@@ -261,18 +306,90 @@ export function QuestionCard({
             </div>
           )}
 
-          {question.type === "likert" && (
-            <p className="text-sm text-muted-foreground">
-              Les répondants choisiront une valeur de 1 (pas du tout d&apos;accord) à 10
-              (tout à fait d&apos;accord).
-            </p>
-          )}
+          {isLikert && (
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label>Consigne</Label>
+                <Select
+                  value={scaleVariant}
+                  onValueChange={(v) => updateScaleField("scaleVariant", v)}
+                  disabled={disabled}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SCALE_VARIANT_ORDER.map((v) => (
+                      <SelectItem key={v} value={v}>
+                        {SCALE_VARIANT_LABELS[v]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Détermine les libellés affichés aux deux extrémités de l&apos;échelle.
+                </p>
+              </div>
 
-          {question.type === "likert_5" && (
-            <p className="text-sm text-muted-foreground">
-              Les répondants choisiront une valeur de 1 (pas du tout d&apos;accord) à 5
-              (tout à fait d&apos;accord).
-            </p>
+              {isCustomScale && (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label className="text-xs">Libellé « 1 » (FR) *</Label>
+                    <Input
+                      value={question.scaleMinFr}
+                      onChange={(e) =>
+                        updateScaleField("scaleMinFr", e.target.value)
+                      }
+                      placeholder="ex: Pas du tout satisfait·e"
+                      disabled={disabled}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Libellé « 1 » (EN)</Label>
+                    <Input
+                      value={question.scaleMinEn}
+                      onChange={(e) =>
+                        updateScaleField("scaleMinEn", e.target.value)
+                      }
+                      placeholder="e.g. Very dissatisfied"
+                      disabled={disabled}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">
+                      Libellé « {scaleMax} » (FR) *
+                    </Label>
+                    <Input
+                      value={question.scaleMaxFr}
+                      onChange={(e) =>
+                        updateScaleField("scaleMaxFr", e.target.value)
+                      }
+                      placeholder="ex: Très satisfait·e"
+                      disabled={disabled}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">
+                      Libellé « {scaleMax} » (EN)
+                    </Label>
+                    <Input
+                      value={question.scaleMaxEn}
+                      onChange={(e) =>
+                        updateScaleField("scaleMaxEn", e.target.value)
+                      }
+                      placeholder="e.g. Very satisfied"
+                      disabled={disabled}
+                    />
+                  </div>
+                </div>
+              )}
+
+              <p className="text-sm text-muted-foreground">
+                Les répondants choisiront une valeur de 1 (
+                {lowerFirst(scaleLabelsFr.min)}) à {scaleMax} (
+                {lowerFirst(scaleLabelsFr.max)}).
+              </p>
+            </div>
           )}
 
           {question.type === "free_text" && (

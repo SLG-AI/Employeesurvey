@@ -1,5 +1,12 @@
 import Anthropic from "@anthropic-ai/sdk";
-import type { ParsedQuestion, ParseResult } from "./parse-questionnaire";
+import type { ParsedQuestion, ParsedScaleVariant } from "./parse-questionnaire";
+
+const SCALE_VARIANTS: ParsedScaleVariant[] = [
+  "agreement",
+  "satisfaction",
+  "frequency",
+  "importance",
+];
 
 export type GenerateSurveyInput = {
   prompt: string;
@@ -71,8 +78,9 @@ PHILOSOPHIE : Le succes d'un sondage ne se mesure pas par la quantite de donnees
 
 - Genere un questionnaire complet avec titre, description, introduction, sections et questions.
 - Chaque question doit avoir un type parmi : "single_choice", "multiple_choice", "likert", "likert_5", "free_text"
-- Utilise "likert_5" par defaut pour les echelles de satisfaction/accord (1-5 : Pas du tout d'accord -> Tout a fait d'accord)
+- Utilise "likert_5" par defaut pour les echelles de satisfaction/accord (1-5)
 - Utilise "likert" (1-10) uniquement si explicitement demande ou pour des echelles de type NPS/UWES
+- Pour les questions "likert" ou "likert_5", ajoute un champ "scale_variant" indiquant la consigne (libelles aux extremites de l'echelle) : "agreement" (pas du tout d'accord -> tout a fait d'accord), "satisfaction" (pas du tout satisfait -> tres satisfait), "frequency" (jamais -> toujours) ou "importance" (pas du tout important -> extremement important). Choisis la variante la plus coherente avec la formulation de la question (formule la question en consequence : "Dans quelle mesure etes-vous satisfait de..." -> satisfaction ; "A quelle frequence..." -> frequency ; etc.). Par defaut "agreement". N'ajoute pas ce champ pour les autres types.
 - Pour les questions a choix, fournis des options pertinentes et equilibrees
 - Genere un code court unique par question (prefixe thematique + numero, ex: SAT-01, MGT-03, PSY-02)
 - Regroupe les questions en sections thematiques coherentes
@@ -94,6 +102,7 @@ Retourne UNIQUEMENT un JSON valide (pas de markdown, pas de texte autour) :
           "text_fr": "Texte de la question",
           "text_en": "",
           "type": "likert_5",
+          "scale_variant": "agreement",
           "question_code": "SAT-01",
           "section": "Nom de la section",
           "options": []
@@ -173,18 +182,27 @@ export async function generateSurvey(
   parsed.introduction = parsed.introduction || "";
   parsed.sections = parsed.sections.map((s) => ({
     name: s.name || "Section",
-    questions: (s.questions || []).map((q) => ({
-      text_fr: q.text_fr || "",
-      text_en: q.text_en || "",
-      type: ["single_choice", "multiple_choice", "likert", "likert_5", "free_text"].includes(q.type)
+    questions: (s.questions || []).map((q) => {
+      const type = ["single_choice", "multiple_choice", "likert", "likert_5", "free_text"].includes(q.type)
         ? q.type
-        : "free_text",
-      question_code: q.question_code || "",
-      section: s.name || "",
-      options: Array.isArray(q.options)
-        ? q.options.map((o) => ({ text_fr: o.text_fr || "", text_en: o.text_en || "" }))
-        : [],
-    })),
+        : "free_text";
+      const isLikert = type === "likert" || type === "likert_5";
+      return {
+        text_fr: q.text_fr || "",
+        text_en: q.text_en || "",
+        type,
+        question_code: q.question_code || "",
+        section: s.name || "",
+        scale_variant: isLikert
+          ? SCALE_VARIANTS.includes(q.scale_variant as ParsedScaleVariant)
+            ? (q.scale_variant as ParsedScaleVariant)
+            : "agreement"
+          : undefined,
+        options: Array.isArray(q.options)
+          ? q.options.map((o) => ({ text_fr: o.text_fr || "", text_en: o.text_en || "" }))
+          : [],
+      };
+    }),
   }));
 
   return parsed;

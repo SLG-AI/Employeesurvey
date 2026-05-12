@@ -32,10 +32,11 @@ import {
   Eye,
 } from "lucide-react";
 import { toast } from "sonner";
-import { AVAILABLE_LANGUAGES, getUIString } from "@/lib/utils/languages";
+import { AVAILABLE_LANGUAGES, getScaleLabels, getUIString } from "@/lib/utils/languages";
 
 import {
   type DistributionMode,
+  type ScaleVariant,
   type SelfDeclarationField,
   SELF_DECLARATION_LABELS,
 } from "@/lib/types";
@@ -63,6 +64,11 @@ type QuestionData = {
   required: boolean;
   sort_order: number;
   section_id: string | null;
+  scale_variant?: ScaleVariant | null;
+  scale_min_label_fr?: string | null;
+  scale_min_label_en?: string | null;
+  scale_max_label_fr?: string | null;
+  scale_max_label_en?: string | null;
   options: {
     id: string;
     text_fr: string;
@@ -582,6 +588,7 @@ export default function SurveyRespondentPage() {
                     getQuestionText={getQuestionText}
                     getOptionText={getOptionText}
                     ui={ui}
+                    lang={lang}
                     brandingPrimaryColor={branding?.primary_color ?? undefined}
                   />
                 </div>
@@ -708,6 +715,7 @@ function QuestionView({
   getQuestionText,
   getOptionText,
   ui,
+  lang,
   brandingPrimaryColor,
 }: {
   question: QuestionData;
@@ -716,8 +724,10 @@ function QuestionView({
   getQuestionText: (id: string, fr: string) => string;
   getOptionText: (id: string, fr: string) => string;
   ui: (key: string) => string;
+  lang: string;
   brandingPrimaryColor?: string;
 }) {
+  const scaleLabels = getScaleLabels(lang, question);
   return (
     <Card>
       <CardHeader>
@@ -781,8 +791,8 @@ function QuestionView({
         {question.type === "likert" && (
           <div className="space-y-4">
             <div className="flex justify-between text-xs text-muted-foreground">
-              <span>{ui("strongly_disagree")}</span>
-              <span>{ui("strongly_agree")}</span>
+              <span>{scaleLabels.min}</span>
+              <span>{scaleLabels.max}</span>
             </div>
             <div className="grid grid-cols-5 gap-2 sm:grid-cols-10 sm:gap-1">
               {Array.from({ length: 10 }, (_, i) => i + 1).map((val) => {
@@ -815,8 +825,8 @@ function QuestionView({
         {question.type === "likert_5" && (
           <div className="space-y-4">
             <div className="flex justify-between text-xs text-muted-foreground">
-              <span>{ui("strongly_disagree")}</span>
-              <span>{ui("strongly_agree")}</span>
+              <span>{scaleLabels.min}</span>
+              <span>{scaleLabels.max}</span>
             </div>
             <div className="grid grid-cols-5 gap-2">
               {Array.from({ length: 5 }, (_, i) => i + 1).map((val) => {

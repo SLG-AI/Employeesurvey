@@ -21,6 +21,68 @@ export type QuestionType =
   | "likert_5"
   | "free_text";
 
+// "Consigne" applied to Likert scales: which anchor labels frame the 1..N scale.
+export type ScaleVariant =
+  | "agreement"
+  | "satisfaction"
+  | "frequency"
+  | "importance"
+  | "custom";
+
+// Preset anchor sets. `labelFr` is the admin-facing name shown in the editor;
+// `minKey`/`maxKey` are i18n keys resolved per respondent language (see languages.ts).
+export const LIKERT_SCALE_VARIANTS: Record<
+  Exclude<ScaleVariant, "custom">,
+  { labelFr: string; minKey: string; maxKey: string }
+> = {
+  agreement: {
+    labelFr: "Accord",
+    minKey: "strongly_disagree",
+    maxKey: "strongly_agree",
+  },
+  satisfaction: {
+    labelFr: "Satisfaction",
+    minKey: "scale_satisfaction_min",
+    maxKey: "scale_satisfaction_max",
+  },
+  frequency: {
+    labelFr: "Fréquence",
+    minKey: "scale_frequency_min",
+    maxKey: "scale_frequency_max",
+  },
+  importance: {
+    labelFr: "Importance",
+    minKey: "scale_importance_min",
+    maxKey: "scale_importance_max",
+  },
+};
+
+// Order used to render the "consigne" selector in the editor.
+export const SCALE_VARIANT_ORDER: ScaleVariant[] = [
+  "agreement",
+  "satisfaction",
+  "frequency",
+  "importance",
+  "custom",
+];
+
+export const SCALE_VARIANT_LABELS: Record<ScaleVariant, string> = {
+  agreement: LIKERT_SCALE_VARIANTS.agreement.labelFr,
+  satisfaction: LIKERT_SCALE_VARIANTS.satisfaction.labelFr,
+  frequency: LIKERT_SCALE_VARIANTS.frequency.labelFr,
+  importance: LIKERT_SCALE_VARIANTS.importance.labelFr,
+  custom: "Personnalisé",
+};
+
+// Subset of question fields that carry the scale "consigne" configuration.
+export type QuestionScaleConfig = {
+  scale_variant?: ScaleVariant | null;
+  scale_min_label_fr?: string | null;
+  scale_min_label_en?: string | null;
+  scale_max_label_fr?: string | null;
+  scale_max_label_en?: string | null;
+};
+
 export type SurveyStatus = "draft" | "published" | "closed";
 
 export type SurveyType = "classique" | "pulse";
@@ -127,7 +189,7 @@ export type Question = {
   required: boolean;
   created_at: string;
   question_options?: QuestionOption[];
-};
+} & QuestionScaleConfig;
 
 export type QuestionOption = {
   id: string;

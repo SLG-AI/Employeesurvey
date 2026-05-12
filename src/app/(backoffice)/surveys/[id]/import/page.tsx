@@ -33,7 +33,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
-import type { QuestionType } from "@/lib/types";
+import type { QuestionType, ScaleVariant } from "@/lib/types";
 import { QUESTION_TYPE_LABELS } from "@/lib/types";
 
 type ParsedQuestion = {
@@ -42,6 +42,7 @@ type ParsedQuestion = {
   type: QuestionType;
   question_code: string;
   section: string;
+  scale_variant?: ScaleVariant;
   options: { text_fr: string; text_en: string }[];
   selected: boolean;
 };
@@ -194,6 +195,8 @@ export default function ImportPage() {
       const q = selectedQuestions[i];
       const sectionId = q.section ? sectionMap[q.section] || null : null;
 
+      const isLikert = q.type === "likert" || q.type === "likert_5";
+
       const { data: insertedQ, error: qError } = await supabase
         .from("questions")
         .insert({
@@ -205,6 +208,7 @@ export default function ImportPage() {
           question_code: q.question_code || null,
           sort_order: startOrder + i,
           required: true,
+          scale_variant: isLikert ? q.scale_variant || "agreement" : "agreement",
         })
         .select("id")
         .single();

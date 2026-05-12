@@ -24,6 +24,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BenchmarkTab } from "@/components/shared/benchmark-tab";
 import { ArrowLeft, Users, ShieldAlert, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
+import { getScaleLabels } from "@/lib/utils/languages";
+import type { ScaleVariant } from "@/lib/types";
 import {
   BarChart,
   Bar,
@@ -79,6 +81,12 @@ type QuestionResult = {
   text_en: string | null;
   sort_order: number;
   section_id: string | null;
+  // scale "consigne"
+  scale_variant?: ScaleVariant | null;
+  scale_min_label_fr?: string | null;
+  scale_min_label_en?: string | null;
+  scale_max_label_fr?: string | null;
+  scale_max_label_en?: string | null;
   // choices
   options?: OptionResult[];
   totalAnswers?: number;
@@ -655,33 +663,40 @@ export default function ResultsPage() {
                   </div>
                 )}
 
-              {(q.type === "likert" || q.type === "likert_5") && q.distribution && (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-center gap-2">
-                    <BarChart3 className="h-5 w-5 text-primary" />
-                    <span className="text-3xl font-bold text-primary">
-                      {q.average}
-                    </span>
-                    <span className="text-muted-foreground">/10</span>
+              {(q.type === "likert" || q.type === "likert_5") && q.distribution && (() => {
+                const scaleMax = q.type === "likert_5" ? 5 : 10;
+                const labels = getScaleLabels("fr", q);
+                return (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-center gap-2">
+                      <BarChart3 className="h-5 w-5 text-primary" />
+                      <span className="text-3xl font-bold text-primary">
+                        {q.average}
+                      </span>
+                      <span className="text-muted-foreground">/{scaleMax}</span>
+                    </div>
+                    <p className="text-center text-xs text-muted-foreground">
+                      Échelle de 1 ({labels.min}) à {scaleMax} ({labels.max})
+                    </p>
+                    <div className="h-48">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={q.distribution}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="value" />
+                          <YAxis allowDecimals={false} />
+                          <Tooltip
+                            formatter={(value) => [
+                              `${value} réponse(s)`,
+                              "Réponses",
+                            ]}
+                          />
+                          <Bar dataKey="count" fill="#2563eb" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
                   </div>
-                  <div className="h-48">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={q.distribution}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="value" />
-                        <YAxis allowDecimals={false} />
-                        <Tooltip
-                          formatter={(value) => [
-                            `${value} réponse(s)`,
-                            "Réponses",
-                          ]}
-                        />
-                        <Bar dataKey="count" fill="#2563eb" radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-              )}
+                );
+              })()}
 
               {q.type === "free_text" && q.responses && (
                 <div className="space-y-2 max-h-96 overflow-y-auto">

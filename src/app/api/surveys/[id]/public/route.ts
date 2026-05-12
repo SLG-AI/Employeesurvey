@@ -71,7 +71,7 @@ export async function GET(
   const { data: questions } = await supabase
     .from("questions")
     .select(
-      "id, type, text_fr, required, sort_order, section_id, question_options(id, text_fr, sort_order)"
+      "id, type, text_fr, required, sort_order, section_id, scale_variant, scale_min_label_fr, scale_min_label_en, scale_max_label_fr, scale_max_label_en, question_options(id, text_fr, sort_order)"
     )
     .eq("survey_id", surveyId)
     .order("sort_order");

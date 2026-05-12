@@ -59,7 +59,13 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import Link from "next/link";
-import type { Survey, Question, QuestionOption, QuestionType } from "@/lib/types";
+import type {
+  Survey,
+  Question,
+  QuestionOption,
+  QuestionType,
+  ScaleVariant,
+} from "@/lib/types";
 import { GenerateAIDialog } from "@/components/survey-editor/generate-ai-dialog";
 import type { GeneratedSurvey } from "@/lib/ai/generate-survey";
 import {
@@ -169,6 +175,11 @@ export default function SurveyEditPage() {
         question_code: q.question_code || "",
         required: q.required,
         sectionId: q.section_id || null,
+        scaleVariant: q.scale_variant || "agreement",
+        scaleMinFr: q.scale_min_label_fr || "",
+        scaleMinEn: q.scale_min_label_en || "",
+        scaleMaxFr: q.scale_max_label_fr || "",
+        scaleMaxEn: q.scale_max_label_en || "",
         options: (q.question_options || [])
           .sort((a, b) => a.sort_order - b.sort_order)
           .map((o) => ({
@@ -293,6 +304,11 @@ export default function SurveyEditPage() {
           text_en: "",
           question_code: "",
           required: false,
+          scaleVariant: "agreement",
+          scaleMinFr: "",
+          scaleMinEn: "",
+          scaleMaxFr: "",
+          scaleMaxEn: "",
           options: [
             { id: crypto.randomUUID(), text_fr: "", text_en: "" },
             { id: crypto.randomUUID(), text_fr: "", text_en: "" },
@@ -421,6 +437,10 @@ export default function SurveyEditPage() {
         const q = sec.questions[qi];
         if (!q.text_fr.trim()) continue;
 
+        const isLikert = q.type === "likert" || q.type === "likert_5";
+        const scaleVariant = isLikert ? q.scaleVariant || "agreement" : "agreement";
+        const isCustomScale = scaleVariant === "custom";
+
         const { data: insertedQ, error: qError } = await supabase
           .from("questions")
           .insert({
@@ -432,6 +452,11 @@ export default function SurveyEditPage() {
             question_code: q.question_code || null,
             sort_order: globalQuestionOrder++,
             required: q.required,
+            scale_variant: scaleVariant,
+            scale_min_label_fr: isCustomScale ? q.scaleMinFr.trim() || null : null,
+            scale_min_label_en: isCustomScale ? q.scaleMinEn.trim() || null : null,
+            scale_max_label_fr: isCustomScale ? q.scaleMaxFr.trim() || null : null,
+            scale_max_label_en: isCustomScale ? q.scaleMaxEn.trim() || null : null,
           })
           .select("id")
           .single();
@@ -537,6 +562,11 @@ export default function SurveyEditPage() {
         text_en: q.text_en || "",
         question_code: q.question_code || "",
         required: true,
+        scaleVariant: ((q.scale_variant as ScaleVariant) || "agreement"),
+        scaleMinFr: "",
+        scaleMinEn: "",
+        scaleMaxFr: "",
+        scaleMaxEn: "",
         options: q.options.map((o) => ({
           id: crypto.randomUUID(),
           text_fr: o.text_fr,

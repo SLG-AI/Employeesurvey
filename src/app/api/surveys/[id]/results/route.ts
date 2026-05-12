@@ -226,7 +226,7 @@ export async function GET(
   // Load questions
   const { data: questions } = await admin
     .from("questions")
-    .select("id, type, text_fr, text_en, sort_order, section_id, question_options(id, text_fr, text_en, sort_order)")
+    .select("id, type, text_fr, text_en, sort_order, section_id, scale_variant, scale_min_label_fr, scale_min_label_en, scale_max_label_fr, scale_max_label_en, question_options(id, text_fr, text_en, sort_order)")
     .eq("survey_id", surveyId)
     .order("sort_order");
 
@@ -312,13 +312,19 @@ export async function GET(
       };
     }
 
+    const qRow = q as Record<string, unknown>;
     return {
       id: q.id,
       type: q.type,
       text_fr: q.text_fr,
       text_en: q.text_en,
       sort_order: q.sort_order,
-      section_id: (q as Record<string, unknown>).section_id || null,
+      section_id: qRow.section_id || null,
+      scale_variant: (qRow.scale_variant as string | null) || "agreement",
+      scale_min_label_fr: (qRow.scale_min_label_fr as string | null) || null,
+      scale_min_label_en: (qRow.scale_min_label_en as string | null) || null,
+      scale_max_label_fr: (qRow.scale_max_label_fr as string | null) || null,
+      scale_max_label_en: (qRow.scale_max_label_en as string | null) || null,
       ...aggregation,
     };
   });
