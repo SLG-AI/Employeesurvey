@@ -22,6 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BenchmarkTab } from "@/components/shared/benchmark-tab";
+import { ExportPdfButton } from "@/components/results/export-pdf-button";
 import { ArrowLeft, Users, ShieldAlert, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
 import { getScaleLabels } from "@/lib/utils/languages";
@@ -169,6 +170,10 @@ export default function ResultsPage() {
   }, [surveyId, societeId, directionId, departmentId, serviceId, sexeFilter, fonctionFilter, lieuTravailFilter, typeContratFilter, tempsTravailFilter, costCenterFilter, ageMinFilter, ageMaxFilter, seniorityMinFilter, seniorityMaxFilter, openDirectionFilter, openDepartementFilter, openServiceFilter]);
 
   useEffect(() => {
+    // Legitimate data-fetch effect: results are re-fetched on mount and whenever
+    // a filter changes. loadResults sets a loading flag synchronously before the
+    // request, which the rule flags as a cascading render — harmless here.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadResults();
   }, [loadResults]);
 
@@ -186,6 +191,28 @@ export default function ResultsPage() {
     data?.organizations?.filter(
       (o) => o.type === "service" && (!departmentId || o.parent_id === departmentId)
     ) || [];
+
+  // Build a human-readable summary of the active filters for the PDF export.
+  const orgName = (id: string) =>
+    data?.organizations?.find((o) => o.id === id)?.name ?? id;
+  const appliedFilters: { label: string; value: string }[] = [];
+  if (societeId) appliedFilters.push({ label: "Société", value: orgName(societeId) });
+  if (directionId) appliedFilters.push({ label: "Direction", value: orgName(directionId) });
+  if (departmentId) appliedFilters.push({ label: "Département", value: orgName(departmentId) });
+  if (serviceId) appliedFilters.push({ label: "Service", value: orgName(serviceId) });
+  if (openDirectionFilter) appliedFilters.push({ label: "Direction (déclarée)", value: openDirectionFilter });
+  if (openDepartementFilter) appliedFilters.push({ label: "Département (déclaré)", value: openDepartementFilter });
+  if (openServiceFilter) appliedFilters.push({ label: "Service (déclaré)", value: openServiceFilter });
+  if (sexeFilter) appliedFilters.push({ label: "Sexe", value: sexeFilter });
+  if (fonctionFilter) appliedFilters.push({ label: "Fonction", value: fonctionFilter });
+  if (lieuTravailFilter) appliedFilters.push({ label: "Lieu de travail", value: lieuTravailFilter });
+  if (typeContratFilter) appliedFilters.push({ label: "Type de contrat", value: typeContratFilter });
+  if (tempsTravailFilter) appliedFilters.push({ label: "Temps de travail", value: tempsTravailFilter });
+  if (costCenterFilter) appliedFilters.push({ label: "Cost center", value: costCenterFilter });
+  if (ageMinFilter || ageMaxFilter)
+    appliedFilters.push({ label: "Âge", value: `${ageMinFilter || "?"} - ${ageMaxFilter || "?"} ans` });
+  if (seniorityMinFilter || seniorityMaxFilter)
+    appliedFilters.push({ label: "Ancienneté", value: `${seniorityMinFilter || "?"} - ${seniorityMaxFilter || "?"} ans` });
 
   if (loading) {
     return (
@@ -210,10 +237,24 @@ export default function ResultsPage() {
             </p>
           </div>
         </div>
-        <Badge variant="outline" className="flex items-center gap-1">
-          <Users className="h-3 w-3" />
-          {data?.totalResponses || 0} réponse(s)
-        </Badge>
+        <div className="flex items-center gap-2">
+          <ExportPdfButton
+            surveyTitle={data?.survey?.title_fr ?? "Enquête"}
+            totalResponses={data?.totalResponses ?? 0}
+            appliedFilters={appliedFilters}
+            sections={data?.sections ?? []}
+            questions={data?.questions ?? []}
+            disabled={
+              !data ||
+              data.anonymityBlocked ||
+              (data.questions?.length ?? 0) === 0
+            }
+          />
+          <Badge variant="outline" className="flex items-center gap-1">
+            <Users className="h-3 w-3" />
+            {data?.totalResponses || 0} réponse(s)
+          </Badge>
+        </div>
       </div>
 
       <Tabs defaultValue="results" className="w-full">
