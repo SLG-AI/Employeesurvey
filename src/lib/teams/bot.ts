@@ -1,4 +1,14 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  isGraphProvisioningConfigured,
+  provisionConversation,
+} from "./graph-provision";
+
+// Default Bot Connector service URL for Teams (public cloud). Used when a
+// conversation reference is provisioned via Graph (Graph does not return a
+// serviceUrl). Override per cloud/region with TEAMS_BOT_SERVICE_URL.
+const DEFAULT_TEAMS_SERVICE_URL =
+  process.env.TEAMS_BOT_SERVICE_URL || "https://smba.trafficmanager.net/teams/";
 
 // Bot credentials (your centralized bot, shared across all client tenants)
 const BOT_APP_ID = process.env.TEAMS_BOT_APP_ID!;
@@ -265,7 +275,40 @@ export async function sendBotMessages(
   const { generateTeamsMessage } = await import("./templates");
 
   for (const recipient of recipients) {
-    const installation = installMap.get(recipient.email.toLowerCase());
+    let installation = installMap.get(recipient.email.toLowerCase());
+
+    // Fallback: if no conversation reference is stored, proactively install
+    // the app via Graph and fetch the chat, so the user does not need to
+    // message the bot first ("hello"). The reference is persisted for reuse.
+    if (!installation && isGraphProvisioningConfigured()) {
+      try {
+        const provisioned = await provisionConversation(recipient.email);
+        if (provisioned) {
+          installation = {
+            conversation_id: provisioned.conversationId,
+            service_url: DEFAULT_TEAMS_SERVICE_URL,
+          };
+          await admin.from("teams_bot_installations").upsert(
+            {
+              azure_tenant_id: process.env.AZURE_TENANT_ID || "",
+              user_email: recipient.email.toLowerCase(),
+              user_aad_id: provisioned.aadId,
+              conversation_id: provisioned.conversationId,
+              service_url: DEFAULT_TEAMS_SERVICE_URL,
+              bot_id: process.env.TEAMS_BOT_APP_ID || "",
+              installed_at: new Date().toISOString(),
+            },
+            { onConflict: "azure_tenant_id,user_aad_id" }
+          );
+        }
+      } catch (error) {
+        console.error(
+          "[Teams Bot] Graph provisioning failed for",
+          recipient.email,
+          error
+        );
+      }
+    }
 
     if (!installation) {
       result.notInstalled++;

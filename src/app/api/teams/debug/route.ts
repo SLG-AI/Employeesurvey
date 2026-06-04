@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isTeamsConfigured, getTeamsMode } from "@/lib/teams/graph";
 import { isBotConfigured } from "@/lib/teams/bot";
+import { isGraphProvisioningConfigured } from "@/lib/teams/graph-provision";
 
 export async function GET() {
   const supabase = await createClient();
@@ -35,12 +36,16 @@ export async function GET() {
     teamsConfigured: isTeamsConfigured(),
     mode: getTeamsMode(),
     botConfigured: isBotConfigured(),
+    // Proactive provisioning lets us invite users without a prior "hello".
+    graphProvisioningConfigured: isGraphProvisioningConfigured(),
     envCheck: {
       TEAMS_BOT_APP_ID: !!process.env.TEAMS_BOT_APP_ID,
       TEAMS_BOT_APP_SECRET: !!process.env.TEAMS_BOT_APP_SECRET,
       AZURE_TENANT_ID: !!process.env.AZURE_TENANT_ID,
       AZURE_CLIENT_ID: !!process.env.AZURE_CLIENT_ID,
       AZURE_CLIENT_SECRET: !!process.env.AZURE_CLIENT_SECRET,
+      TEAMS_CATALOG_APP_ID: !!process.env.TEAMS_CATALOG_APP_ID,
+      TEAMS_BOT_SERVICE_URL: !!process.env.TEAMS_BOT_SERVICE_URL,
     },
     installations: {
       count: count || 0,
