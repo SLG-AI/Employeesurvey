@@ -220,6 +220,7 @@ export function TargetedSendPanel({
       let failed = 0;
       let notInstalled = 0;
       const errors: string[] = [];
+      const notInstalledEmails: string[] = [];
 
       for (let i = 0; i < results.length; i++) {
         const r = results[i];
@@ -236,18 +237,51 @@ export function TargetedSendPanel({
         sent += data.sent ?? 0;
         failed += data.failed ?? 0;
         notInstalled += data.notInstalled ?? 0;
+        // Collecte les emails des destinataires dont le bot Teams n'est pas installé
+        if (Array.isArray(data.errors)) {
+          for (const e of data.errors) {
+            if (
+              e?.email &&
+              typeof e.error === "string" &&
+              e.error.toLowerCase().includes("non installé")
+            ) {
+              notInstalledEmails.push(e.email);
+            }
+          }
+        }
       }
 
       if (sent > 0) {
         toast.success(`${sent} envoi(s) réussi(s)`, {
-          description:
-            `Mode : ${MODE_LABELS[mode].title} · Canaux : ${channels.join(", ")}` +
-            (notInstalled > 0 ? ` · Teams non installé : ${notInstalled}` : ""),
+          description: `Mode : ${MODE_LABELS[mode].title} · Canaux : ${channels.join(", ")}`,
         });
       }
       if (failed > 0) toast.error(`${failed} échec(s)`);
       if (errors.length) toast.error(errors.join(" | "));
-      if (sent === 0 && failed === 0 && errors.length === 0) {
+      // Avertissement distinct et visible : destinataires sans bot Teams installé
+      if (notInstalled > 0) {
+        const preview = notInstalledEmails.slice(0, 5).join(", ");
+        const more =
+          notInstalledEmails.length > 5
+            ? ` (+${notInstalledEmails.length - 5})`
+            : "";
+        toast.warning(
+          `${notInstalled} destinataire(s) n'ont pas reçu la notification Teams`,
+          {
+            description:
+              `Application PulseSurvey non installée dans Teams` +
+              (preview ? ` : ${preview}${more}` : "") +
+              `. Ces personnes doivent d'abord ajouter l'application dans Teams pour recevoir le sondage.`,
+            duration: 10000,
+          }
+        );
+      }
+      if (
+        sent === 0 &&
+        failed === 0 &&
+        notInstalled === 0 &&
+        errors.length === 0
+      ) {
         toast.info("Aucun envoi effectué");
       }
 
