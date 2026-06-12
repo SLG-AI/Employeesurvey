@@ -1,4 +1,8 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  isActivityNotifyConfigured,
+  sendActivityNotifications,
+} from "./activity";
 
 // Bot credentials (your centralized bot, shared across all client tenants)
 const BOT_APP_ID = process.env.TEAMS_BOT_APP_ID!;
@@ -264,15 +268,17 @@ export async function sendBotMessages(
   // Import template generator
   const { generateTeamsMessage } = await import("./templates");
 
+  // Recipients with no stored conversation reference (the bot was never
+  // "activated" by a first interaction). Instead of failing, we fall back to
+  // Teams activity-feed notifications, which reach pre-installed users without
+  // any interaction. Collected here, dispatched after the bot loop.
+  const noReference: TeamsBotRecipient[] = [];
+
   for (const recipient of recipients) {
     const installation = installMap.get(recipient.email.toLowerCase());
 
     if (!installation) {
-      result.notInstalled++;
-      result.errors.push({
-        email: recipient.email,
-        error: "Bot non installé pour cet utilisateur",
-      });
+      noReference.push(recipient);
       continue;
     }
 
@@ -299,6 +305,32 @@ export async function sendBotMessages(
 
     // Small delay to respect rate limits
     await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+
+  // Fallback for recipients without a conversation reference: activity-feed
+  // notifications (no reference / no "bonjour" required). If the activity path
+  // is not configured/consented yet, they remain counted as notInstalled.
+  if (noReference.length > 0) {
+    if (isActivityNotifyConfigured()) {
+      const activity = await sendActivityNotifications(
+        noReference,
+        surveyTitle,
+        type
+      );
+      result.sent += activity.sent;
+      result.failed += activity.failed;
+      result.errors.push(...activity.errors);
+      // Anyone the activity path could not reach (resolve/delivery failure) is
+      // already accounted in activity.failed above.
+    } else {
+      result.notInstalled += noReference.length;
+      for (const r of noReference) {
+        result.errors.push({
+          email: r.email,
+          error: "Bot non installé pour cet utilisateur",
+        });
+      }
+    }
   }
 
   return result;

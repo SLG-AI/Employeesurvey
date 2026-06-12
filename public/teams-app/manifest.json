@@ -1,7 +1,7 @@
 {
   "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.17/MicrosoftTeams.schema.json",
   "manifestVersion": "1.17",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "id": "478e9d1c-39e1-4a6b-8b9a-0003135f2b47",
   "developer": {
     "name": "PulseSurvey",
@@ -41,6 +41,18 @@
       ]
     }
   ],
+  "staticTabs": [
+    {
+      "entityId": "survey",
+      "name": "Sondage",
+      "contentUrl": "https://employeesurvey.netlify.app/teams",
+      "scopes": ["personal"]
+    }
+  ],
   "permissions": ["identity", "messageTeamMembers"],
-  "validDomains": ["employeesurvey.netlify.app"]
+  "validDomains": ["employeesurvey.netlify.app"],
+  "webApplicationInfo": {
+    "id": "478e9d1c-39e1-4a6b-8b9a-0003135f2b47",
+    "resource": "api://employeesurvey.netlify.app/478e9d1c-39e1-4a6b-8b9a-0003135f2b47"
+  }
 }
