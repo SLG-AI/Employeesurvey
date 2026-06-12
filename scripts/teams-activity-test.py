@@ -75,9 +75,10 @@ def resolve_aad_id(tok, email):
 
 
 def build_survey_deeplink(survey_link):
-    ctx = urllib.parse.quote(json.dumps({
-        "contentUrl": survey_link, "websiteUrl": survey_link, "name": "Sondage"}))
-    return f"https://teams.microsoft.com/l/stage/{TEAMS_APP_ID}/0?context={ctx}"
+    # Deep link to the personal "survey" static tab; the survey URL travels in
+    # subEntityId and the tab page navigates to it (mirrors activity.ts).
+    ctx = urllib.parse.quote(json.dumps({"subEntityId": survey_link}))
+    return f"https://teams.microsoft.com/l/entity/{TEAMS_APP_ID}/survey?context={ctx}"
 
 
 def send_notification(tok, aad_id, preview, survey_link):

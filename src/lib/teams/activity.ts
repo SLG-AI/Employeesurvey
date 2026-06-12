@@ -7,21 +7,21 @@ const GRAPH = "https://graph.microsoft.com/v1.0";
 const TEAMS_APP_ID =
   process.env.TEAMS_APP_MANIFEST_ID || "478e9d1c-39e1-4a6b-8b9a-0003135f2b47";
 
+// entityId of the personal static tab declared in the Teams app manifest.
+const TEAMS_SURVEY_TAB_ENTITY = "survey";
+
 /**
  * Activity notifications require `topic.webUrl` to be a Microsoft Teams deep
- * link (teams.microsoft.com/l/...), NOT an arbitrary external URL. We wrap the
- * survey URL in a stage-view deep link, which opens it inside Teams — allowed
- * because the survey domain is declared in the app manifest `validDomains`.
+ * link (teams.microsoft.com/l/...), NOT an arbitrary external URL. We deep-link
+ * to the app's personal "survey" tab and pass the actual survey URL via
+ * `subEntityId`; the tab page (src/app/teams/page.tsx) reads it and navigates
+ * there, so the survey renders inside Teams.
  */
 function buildSurveyDeepLink(surveyLink: string): string {
   const context = encodeURIComponent(
-    JSON.stringify({
-      contentUrl: surveyLink,
-      websiteUrl: surveyLink,
-      name: "Sondage",
-    })
+    JSON.stringify({ subEntityId: surveyLink })
   );
-  return `https://teams.microsoft.com/l/stage/${TEAMS_APP_ID}/0?context=${context}`;
+  return `https://teams.microsoft.com/l/entity/${TEAMS_APP_ID}/${TEAMS_SURVEY_TAB_ENTITY}?context=${context}`;
 }
 
 /**
