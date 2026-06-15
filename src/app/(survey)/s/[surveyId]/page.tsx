@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { AVAILABLE_LANGUAGES, getScaleLabels, getUIString } from "@/lib/utils/languages";
+import { isLightColor, readableTextColor } from "@/lib/utils/color";
 
 import {
   type DistributionMode,
@@ -150,6 +151,13 @@ export default function SurveyRespondentPage() {
   const selfDeclFields = survey?.open_self_declaration_fields || [];
   const hasSelfDecl = isOpenMode && selfDeclFields.length > 0;
   const totalSteps = questions.length + 2 + (hasSelfDecl ? 1 : 0);
+  // A near-white / too-light brand colour is invisible as a filled CTA
+  // background or outline accent on the white survey page. In that case fall
+  // back to the app default styling (null) instead of the brand colour.
+  const brandColor =
+    branding?.primary_color && !isLightColor(branding.primary_color)
+      ? branding.primary_color
+      : null;
   const ui = (key: string, replacements?: Record<string, string | number>) =>
     getUIString(lang, key, replacements);
 
@@ -484,7 +492,7 @@ export default function SurveyRespondentPage() {
           <Progress
             value={progress}
             className="h-2"
-            indicatorColor={branding?.primary_color ?? undefined}
+            indicatorColor={brandColor ?? undefined}
           />
           <p className="mt-1 text-xs text-muted-foreground text-right">
             {currentStep}/{totalSteps - 1}
@@ -541,7 +549,7 @@ export default function SurveyRespondentPage() {
                         className="w-full"
                         onClick={() => validateToken(token)}
                         disabled={!token.trim() || validatingToken}
-                        style={branding?.primary_color ? { backgroundColor: branding.primary_color } : undefined}
+                        style={brandColor ? { backgroundColor: brandColor, color: readableTextColor(brandColor) } : undefined}
                       >
                         {validatingToken ? (
                           <>
@@ -589,7 +597,7 @@ export default function SurveyRespondentPage() {
                     getOptionText={getOptionText}
                     ui={ui}
                     lang={lang}
-                    brandingPrimaryColor={branding?.primary_color ?? undefined}
+                    brandingPrimaryColor={brandColor ?? undefined}
                   />
                 </div>
               );
@@ -657,7 +665,7 @@ export default function SurveyRespondentPage() {
                         onClick={handleSubmit}
                         disabled={submitting}
                         className="w-full sm:w-auto"
-                        style={branding?.primary_color ? { backgroundColor: branding.primary_color } : undefined}
+                        style={brandColor ? { backgroundColor: brandColor, color: readableTextColor(brandColor) } : undefined}
                       >
                         {submitting ? (
                           <>
@@ -687,7 +695,7 @@ export default function SurveyRespondentPage() {
             variant="outline"
             onClick={() => setCurrentStep((s) => Math.max(0, s - 1))}
             disabled={currentStep === 0 || translating}
-            style={branding?.primary_color ? { borderColor: branding.primary_color, color: branding.primary_color } : undefined}
+            style={brandColor ? { borderColor: brandColor, color: brandColor } : undefined}
           >
             <ChevronLeft className="mr-1 h-4 w-4" />
             {ui("previous")}
@@ -696,7 +704,7 @@ export default function SurveyRespondentPage() {
             <Button
               onClick={() => setCurrentStep((s) => s + 1)}
               disabled={!canProceed() || translating}
-              style={branding?.primary_color ? { backgroundColor: branding.primary_color } : undefined}
+              style={brandColor ? { backgroundColor: brandColor, color: readableTextColor(brandColor) } : undefined}
             >
               {ui("next")}
               <ChevronRight className="ml-1 h-4 w-4" />
@@ -807,7 +815,7 @@ function QuestionView({
                         ? brandingPrimaryColor ? "text-white" : "border-primary bg-primary text-primary-foreground"
                         : "hover:bg-muted"
                     }`}
-                    style={isSelected && brandingPrimaryColor ? { backgroundColor: brandingPrimaryColor, borderColor: brandingPrimaryColor } : undefined}
+                    style={isSelected && brandingPrimaryColor ? { backgroundColor: brandingPrimaryColor, borderColor: brandingPrimaryColor, color: readableTextColor(brandingPrimaryColor) } : undefined}
                   >
                     {val}
                   </button>
@@ -841,7 +849,7 @@ function QuestionView({
                         ? brandingPrimaryColor ? "text-white" : "border-primary bg-primary text-primary-foreground"
                         : "hover:bg-muted"
                     }`}
-                    style={isSelected && brandingPrimaryColor ? { backgroundColor: brandingPrimaryColor, borderColor: brandingPrimaryColor } : undefined}
+                    style={isSelected && brandingPrimaryColor ? { backgroundColor: brandingPrimaryColor, borderColor: brandingPrimaryColor, color: readableTextColor(brandingPrimaryColor) } : undefined}
                   >
                     {val}
                   </button>
