@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { pollTeamsJob } from "@/lib/teams/poll-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -454,8 +455,58 @@ export default function DistributePage() {
     }
   }
 
+  // Drive an async Teams job to completion: show a live progress toast while the
+  // background worker sends, then a final summary. Delivery is recorded
+  // incrementally server-side, so the result is accurate even for large lists.
+  async function runTeamsJob(
+    jobId: string,
+    labels: { progress: string; success: string },
+    toastId: string | number
+  ) {
+    const final = await pollTeamsJob(
+      surveyId,
+      jobId,
+      (s) => {
+        if (s.status === "running" || s.status === "queued") {
+          toast.loading(
+            `${labels.progress} ${s.sent}${s.total ? `/${s.total}` : ""}…`,
+            { id: toastId }
+          );
+        }
+      },
+      { intervalMs: 2000 }
+    );
+
+    if (final.status === "done") {
+      toast.success(`${final.sent} ${labels.success}`, { id: toastId });
+      if (final.failed > 0) {
+        toast.error(`${final.failed} échec(s) Teams`, { duration: 5000 });
+      }
+      if (final.notInstalled > 0) {
+        toast.warning(
+          `${final.notInstalled} destinataire(s) n'ont pas installé le bot Teams`,
+          { duration: 7000 }
+        );
+      }
+      if (final.sent === 0 && final.failed === 0 && final.notInstalled === 0) {
+        toast.info("Aucune notification à envoyer", { id: toastId });
+      }
+    } else if (final.status === "error") {
+      toast.error(final.errorMessage || "Erreur lors de l'envoi Teams", {
+        id: toastId,
+      });
+    } else {
+      toast.warning(
+        "L'envoi se poursuit en arrière-plan — actualisez dans quelques instants pour voir l'état final.",
+        { id: toastId, duration: 8000 }
+      );
+    }
+    await loadData();
+  }
+
   async function sendTeamsInvitations(force = false) {
     setSendingTeamsInvitations(true);
+    const toastId = toast.loading("Envoi Teams en préparation…");
     try {
       const response = await fetch(`/api/surveys/${surveyId}/send-teams-invitations`, {
         method: "POST",
@@ -464,34 +515,18 @@ export default function DistributePage() {
       });
       const data = await response.json();
 
-      if (response.ok) {
-        if (data.sent > 0) {
-          toast.success(`${data.sent} notification(s) Teams envoyée(s)`);
-        }
-        if (data.failed > 0) {
-          toast.error(`${data.failed} notification(s) Teams échouée(s)`, { duration: 5000 });
-        }
-        if (data.notInstalled > 0) {
-          toast.warning(
-            `${data.notInstalled} destinataire(s) n'ont pas installé le bot Teams`,
-            { duration: 7000 }
-          );
-        }
-        if (data.sent === 0 && data.failed === 0 && (!data.notInstalled || data.notInstalled === 0)) {
-          toast.info(data.message || "Aucune notification à envoyer");
-        }
-        await loadData();
-      } else {
-        toast.error(data.error || "Erreur lors de l'envoi Teams");
+      if (!response.ok || !data.jobId) {
+        toast.error(data.error || "Erreur lors de l'envoi Teams", { id: toastId });
+        return;
       }
-    } catch {
-      // The request may have timed out while the server kept sending. Delivery
-      // is recorded as it happens server-side, so refresh to show the real
-      // state instead of implying a total failure that risks a double-send.
-      toast.warning(
-        "Connexion interrompue. L'envoi a peut-être abouti partiellement — l'état a été actualisé, vérifiez avant de renvoyer.",
-        { duration: 8000 }
+
+      await runTeamsJob(
+        data.jobId,
+        { progress: "Notifications Teams envoyées", success: "notification(s) Teams envoyée(s)" },
+        toastId
       );
+    } catch {
+      toast.error("Erreur réseau lors de l'envoi Teams", { id: toastId });
       await loadData();
     } finally {
       setSendingTeamsInvitations(false);
@@ -500,40 +535,25 @@ export default function DistributePage() {
 
   async function sendTeamsReminders() {
     setSendingTeamsReminders(true);
+    const toastId = toast.loading("Rappels Teams en préparation…");
     try {
       const response = await fetch(`/api/surveys/${surveyId}/send-teams-reminders`, {
         method: "POST",
       });
       const data = await response.json();
 
-      if (response.ok) {
-        if (data.sent > 0) {
-          toast.success(`${data.sent} rappel(s) Teams envoyé(s)`);
-        }
-        if (data.failed > 0) {
-          toast.error(`${data.failed} rappel(s) Teams échoué(s)`, { duration: 5000 });
-        }
-        if (data.notInstalled > 0) {
-          toast.warning(
-            `${data.notInstalled} destinataire(s) n'ont pas installé le bot Teams`,
-            { duration: 7000 }
-          );
-        }
-        if (data.sent === 0 && data.failed === 0 && (!data.notInstalled || data.notInstalled === 0)) {
-          toast.info(data.message || "Aucun rappel Teams à envoyer");
-        }
-        await loadData();
-      } else {
-        toast.error(data.error || "Erreur lors de l'envoi Teams");
+      if (!response.ok || !data.jobId) {
+        toast.error(data.error || "Erreur lors de l'envoi Teams", { id: toastId });
+        return;
       }
-    } catch {
-      // The request may have timed out while the server kept sending. Delivery
-      // is recorded as it happens server-side, so refresh to show the real
-      // state instead of implying a total failure that risks a double-send.
-      toast.warning(
-        "Connexion interrompue. L'envoi a peut-être abouti partiellement — l'état a été actualisé, vérifiez avant de renvoyer.",
-        { duration: 8000 }
+
+      await runTeamsJob(
+        data.jobId,
+        { progress: "Rappels Teams envoyés", success: "rappel(s) Teams envoyé(s)" },
+        toastId
       );
+    } catch {
+      toast.error("Erreur réseau lors de l'envoi Teams", { id: toastId });
       await loadData();
     } finally {
       setSendingTeamsReminders(false);

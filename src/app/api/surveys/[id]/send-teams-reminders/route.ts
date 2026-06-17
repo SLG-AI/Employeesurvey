@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { sendTeamsMessages, isTeamsConfigured } from "@/lib/teams/graph";
-import { generateSurveyLink } from "@/lib/utils/token";
+import { isTeamsConfigured } from "@/lib/teams/graph";
 import {
-  selectRecipients,
-  type SendMode,
-} from "@/lib/surveys/recipient-selector";
+  createTeamsJob,
+  triggerTeamsWorker,
+  processTeamsJob,
+} from "@/lib/teams/send-job";
+import { type SendMode } from "@/lib/surveys/recipient-selector";
 
 const VALID_MODES: SendMode[] = [
   "non_responders",
@@ -68,15 +69,12 @@ export async function POST(
 
   const { data: survey, error: surveyError } = await admin
     .from("surveys")
-    .select("title_fr, status")
+    .select("status")
     .eq("id", surveyId)
     .single();
 
   if (surveyError || !survey) {
-    return NextResponse.json(
-      { error: "Sondage introuvable" },
-      { status: 404 }
-    );
+    return NextResponse.json({ error: "Sondage introuvable" }, { status: 404 });
   }
 
   if (survey.status !== "published") {
@@ -86,107 +84,24 @@ export async function POST(
     );
   }
 
-  const selection = await selectRecipients(admin, {
+  // Enqueue the send as a background job so the request returns immediately and
+  // large distributions are never capped by the serverless request timeout.
+  const jobId = await createTeamsJob(admin, {
     surveyId,
     mode,
     tokenIds,
+    createdBy: user.id,
   });
 
-  if (!selection.ok) {
-    return NextResponse.json(
-      { error: selection.error },
-      { status: selection.status }
-    );
+  const origin =
+    process.env.NEXT_PUBLIC_APP_URL || process.env.URL || request.nextUrl.origin;
+  const triggered = await triggerTeamsWorker(jobId, origin);
+
+  // Local dev (or any environment without the background function) has no worker
+  // to call — process inline so the flow still completes end-to-end.
+  if (!triggered) {
+    await processTeamsJob(jobId);
   }
 
-  const emailTokens = selection.tokens.filter((t) => !!t.email);
-
-  if (emailTokens.length === 0) {
-    return NextResponse.json({
-      success: true,
-      sent: 0,
-      failed: 0,
-      total: 0,
-      message: "Aucun destinataire avec email pour ce ciblage",
-    });
-  }
-
-  const baseUrl =
-    process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin;
-
-  const recipients = emailTokens.map((t) => ({
-    email: t.email!,
-    employeeName: t.employee_name || "Collaborateur",
-    surveyLink: generateSurveyLink(baseUrl, surveyId, t.token),
-  }));
-
-  const messageType = mode === "never_invited" ? "invitation" : "reminder";
-
-  // Map each recipient email to its token id so we can mark delivery as it
-  // happens. Marking incrementally (rather than once after the whole loop)
-  // makes the send crash-safe: if the function times out mid-send, everyone
-  // already reached is recorded, so a retry skips them and never double-sends.
-  const columnToUpdate =
-    mode === "never_invited"
-      ? "teams_invitation_sent_at"
-      : "teams_reminder_sent_at";
-  const tokenIdByEmail = new Map<string, string>();
-  for (const t of emailTokens) {
-    tokenIdByEmail.set(t.email!.toLowerCase(), t.id);
-  }
-
-  const markSent = async (email: string) => {
-    const tokenId = tokenIdByEmail.get(email.toLowerCase());
-    if (!tokenId) return;
-    try {
-      if (selection.useSurveyTokens) {
-        await admin
-          .from("survey_tokens")
-          .update({ [columnToUpdate]: new Date().toISOString() })
-          .eq("survey_id", surveyId)
-          .eq("token_id", tokenId);
-      } else {
-        await admin
-          .from("anonymous_tokens")
-          .update({ [columnToUpdate]: new Date().toISOString() })
-          .eq("id", tokenId);
-      }
-    } catch (err) {
-      console.error("[Teams] Failed to mark sent for", email, err);
-    }
-  };
-
-  try {
-    const result = await sendTeamsMessages(
-      recipients,
-      survey.title_fr,
-      messageType,
-      markSent
-    );
-
-    return NextResponse.json({
-      success: true,
-      mode,
-      sent: result.sent,
-      failed: result.failed,
-      notInstalled: result.notInstalled || 0,
-      total: recipients.length,
-      errors: result.errors,
-      ...(result.sent === 0 &&
-      result.failed === 0 &&
-      (result.notInstalled || 0) > 0
-        ? {
-            message: `Le bot Teams n'est pas installé pour ${result.notInstalled} destinataire(s). Les employés doivent d'abord installer l'application PulseSurvey dans Teams.`,
-          }
-        : {}),
-    });
-  } catch (error) {
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error ? error.message : "Erreur lors de l'envoi Teams",
-      },
-      { status: 500 }
-    );
-  }
+  return NextResponse.json({ async: true, jobId, mode, status: "queued" });
 }
