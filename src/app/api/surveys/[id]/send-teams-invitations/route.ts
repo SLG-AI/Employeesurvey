@@ -128,46 +128,48 @@ export async function POST(
 
   const messageType = mode === "never_invited" ? "invitation" : "reminder";
 
+  // Map each recipient email to its token id so we can mark delivery as it
+  // happens. Marking incrementally (rather than once after the whole loop)
+  // makes the send crash-safe: if the function times out mid-send, everyone
+  // already reached is recorded, so a retry in "never_invited" mode skips them
+  // and never double-sends.
+  const columnToUpdate =
+    mode === "never_invited"
+      ? "teams_invitation_sent_at"
+      : "teams_reminder_sent_at";
+  const tokenIdByEmail = new Map<string, string>();
+  for (const t of emailTokens) {
+    tokenIdByEmail.set(t.email!.toLowerCase(), t.id);
+  }
+
+  const markSent = async (email: string) => {
+    const tokenId = tokenIdByEmail.get(email.toLowerCase());
+    if (!tokenId) return;
+    try {
+      if (selection.useSurveyTokens) {
+        await admin
+          .from("survey_tokens")
+          .update({ [columnToUpdate]: new Date().toISOString() })
+          .eq("survey_id", surveyId)
+          .eq("token_id", tokenId);
+      } else {
+        await admin
+          .from("anonymous_tokens")
+          .update({ [columnToUpdate]: new Date().toISOString() })
+          .eq("id", tokenId);
+      }
+    } catch (err) {
+      console.error("[Teams] Failed to mark sent for", email, err);
+    }
+  };
+
   try {
     const result = await sendTeamsMessages(
       recipients,
       survey.title_fr,
-      messageType
+      messageType,
+      markSent
     );
-
-    if (result.sent > 0) {
-      const failedEmails = new Set(result.errors.map((e) => e.email));
-      const successTokens = emailTokens.filter(
-        (t) => !failedEmails.has(t.email!)
-      );
-
-      const nowIso = new Date().toISOString();
-      const columnToUpdate =
-        mode === "never_invited"
-          ? "teams_invitation_sent_at"
-          : "teams_reminder_sent_at";
-
-      if (selection.useSurveyTokens) {
-        if (successTokens.length > 0) {
-          await admin
-            .from("survey_tokens")
-            .update({ [columnToUpdate]: nowIso })
-            .eq("survey_id", surveyId)
-            .in(
-              "token_id",
-              successTokens.map((t) => t.id)
-            );
-        }
-      } else {
-        await admin
-          .from("anonymous_tokens")
-          .update({ [columnToUpdate]: nowIso })
-          .in(
-            "id",
-            successTokens.map((t) => t.id)
-          );
-      }
-    }
 
     return NextResponse.json({
       success: true,

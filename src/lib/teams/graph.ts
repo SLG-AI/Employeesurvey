@@ -1,5 +1,6 @@
 import { generateTeamsMessage, type TeamsMessageType } from "./templates";
 import { isBotConfigured, sendBotMessages } from "./bot";
+import type { OnSentCallback } from "./types";
 
 const BATCH_SIZE = 20;
 
@@ -137,7 +138,8 @@ async function sendChatMessage(
 async function sendLegacyMessages(
   recipients: TeamsRecipient[],
   surveyTitle: string,
-  type: TeamsMessageType
+  type: TeamsMessageType,
+  onSent?: OnSentCallback
 ): Promise<SendTeamsResult> {
   const result: SendTeamsResult = { sent: 0, failed: 0, errors: [] };
 
@@ -162,6 +164,8 @@ async function sendLegacyMessages(
 
         await sendChatMessage(accessToken, recipient.email, message);
         result.sent++;
+        // Mark immediately so an interruption never re-sends to this person.
+        await onSent?.(recipient.email);
       } catch (error) {
         result.failed++;
         result.errors.push({
@@ -189,7 +193,8 @@ async function sendLegacyMessages(
 export async function sendTeamsMessages(
   recipients: TeamsRecipient[],
   surveyTitle: string,
-  type: TeamsMessageType = "invitation"
+  type: TeamsMessageType = "invitation",
+  onSent?: OnSentCallback
 ): Promise<SendTeamsResult> {
   if (recipients.length === 0) {
     return { sent: 0, failed: 0, errors: [] };
@@ -203,9 +208,9 @@ export async function sendTeamsMessages(
 
   // Prefer bot approach
   if (isBotConfigured()) {
-    return sendBotMessages(recipients, surveyTitle, type);
+    return sendBotMessages(recipients, surveyTitle, type, onSent);
   }
 
   // Fallback to legacy
-  return sendLegacyMessages(recipients, surveyTitle, type);
+  return sendLegacyMessages(recipients, surveyTitle, type, onSent);
 }
