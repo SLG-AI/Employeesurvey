@@ -3,6 +3,7 @@ import {
   isActivityNotifyConfigured,
   sendActivityNotifications,
 } from "./activity";
+import type { OnSentCallback } from "./types";
 
 // Bot credentials (your centralized bot, shared across all client tenants)
 const BOT_APP_ID = process.env.TEAMS_BOT_APP_ID!;
@@ -163,12 +164,11 @@ export async function removeInstallation(activity: BotActivity) {
  * Send a proactive message to a user via their stored conversation reference.
  */
 async function sendProactiveMessage(
+  accessToken: string,
   serviceUrl: string,
   conversationId: string,
   message: string
 ): Promise<void> {
-  const accessToken = await getBotAccessToken();
-
   // Parse the markdown message to extract link
   const linkMatch = message.match(/\[([^\]]+)\]\(([^)]+)\)/);
   const linkText = linkMatch ? linkMatch[1] : "Ouvrir";
@@ -238,7 +238,8 @@ export interface SendBotResult {
 export async function sendBotMessages(
   recipients: TeamsBotRecipient[],
   surveyTitle: string,
-  type: "invitation" | "reminder"
+  type: "invitation" | "reminder",
+  onSent?: OnSentCallback
 ): Promise<SendBotResult> {
   const result: SendBotResult = {
     sent: 0,
@@ -274,6 +275,15 @@ export async function sendBotMessages(
   // any interaction. Collected here, dispatched after the bot loop.
   const noReference: TeamsBotRecipient[] = [];
 
+  // Fetch a bot access token ONCE for the whole batch. Previously it was
+  // re-fetched per message, which for large lists added enough latency to push
+  // the request past the serverless timeout (messages sent, nothing marked →
+  // duplicates on retry). The token outlives a single send loop.
+  const hasInstalled = recipients.some((r) =>
+    installMap.has(r.email.toLowerCase())
+  );
+  const botToken = hasInstalled ? await getBotAccessToken() : "";
+
   for (const recipient of recipients) {
     const installation = installMap.get(recipient.email.toLowerCase());
 
@@ -290,11 +300,14 @@ export async function sendBotMessages(
       });
 
       await sendProactiveMessage(
+        botToken,
         installation.service_url,
         installation.conversation_id,
         message
       );
       result.sent++;
+      // Mark immediately so an interruption never re-sends to this person.
+      await onSent?.(recipient.email);
     } catch (error) {
       result.failed++;
       result.errors.push({
@@ -315,7 +328,8 @@ export async function sendBotMessages(
       const activity = await sendActivityNotifications(
         noReference,
         surveyTitle,
-        type
+        type,
+        onSent
       );
       result.sent += activity.sent;
       result.failed += activity.failed;

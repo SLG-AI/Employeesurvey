@@ -485,7 +485,14 @@ export default function DistributePage() {
         toast.error(data.error || "Erreur lors de l'envoi Teams");
       }
     } catch {
-      toast.error("Erreur réseau lors de l'envoi Teams");
+      // The request may have timed out while the server kept sending. Delivery
+      // is recorded as it happens server-side, so refresh to show the real
+      // state instead of implying a total failure that risks a double-send.
+      toast.warning(
+        "Connexion interrompue. L'envoi a peut-être abouti partiellement — l'état a été actualisé, vérifiez avant de renvoyer.",
+        { duration: 8000 }
+      );
+      await loadData();
     } finally {
       setSendingTeamsInvitations(false);
     }
@@ -520,7 +527,14 @@ export default function DistributePage() {
         toast.error(data.error || "Erreur lors de l'envoi Teams");
       }
     } catch {
-      toast.error("Erreur réseau lors de l'envoi Teams");
+      // The request may have timed out while the server kept sending. Delivery
+      // is recorded as it happens server-side, so refresh to show the real
+      // state instead of implying a total failure that risks a double-send.
+      toast.warning(
+        "Connexion interrompue. L'envoi a peut-être abouti partiellement — l'état a été actualisé, vérifiez avant de renvoyer.",
+        { duration: 8000 }
+      );
+      await loadData();
     } finally {
       setSendingTeamsReminders(false);
     }

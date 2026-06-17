@@ -1,4 +1,5 @@
 import type { TeamsMessageType } from "./templates";
+import type { OnSentCallback } from "./types";
 
 const GRAPH = "https://graph.microsoft.com/v1.0";
 
@@ -160,7 +161,8 @@ export interface ActivityResult {
 export async function sendActivityNotifications(
   recipients: ActivityRecipient[],
   surveyTitle: string,
-  type: TeamsMessageType
+  type: TeamsMessageType,
+  onSent?: OnSentCallback
 ): Promise<ActivityResult> {
   const result: ActivityResult = { sent: 0, failed: 0, errors: [] };
   if (recipients.length === 0 || !isActivityNotifyConfigured()) return result;
@@ -200,6 +202,8 @@ export async function sendActivityNotifications(
       } else {
         await sendOne(token, aadId, topicTitle, preview, r.surveyLink);
         result.sent++;
+        // Mark immediately so an interruption never re-sends to this person.
+        await onSent?.(r.email);
       }
     } catch (error) {
       result.failed++;
