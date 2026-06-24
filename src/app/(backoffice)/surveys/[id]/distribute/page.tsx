@@ -95,6 +95,7 @@ export default function DistributePage() {
   const [sendingInvitations, setSendingInvitations] = useState(false);
   const [sendingReminders, setSendingReminders] = useState(false);
   const [teamsConfigured, setTeamsConfigured] = useState<boolean | null>(null);
+  const [smsConfigured, setSmsConfigured] = useState<boolean | null>(null);
   const [teamsStats, setTeamsStats] = useState<{
     total: number;
     invited: number;
@@ -323,6 +324,15 @@ export default function DistributePage() {
       setTeamsConfigured(teamsData.configured);
     } catch {
       setTeamsConfigured(false);
+    }
+
+    // Check SMS (Twilio) configuration
+    try {
+      const smsRes = await fetch("/api/sms-config");
+      const smsData = await smsRes.json();
+      setSmsConfigured(smsData.configured);
+    } catch {
+      setSmsConfigured(false);
     }
 
     // Generate generic link and QR
@@ -1355,6 +1365,7 @@ export default function DistributePage() {
         surveyId={surveyId}
         surveyPublished={survey?.status === "published"}
         teamsConfigured={teamsConfigured === true}
+        smsConfigured={smsConfigured === true}
         onSent={loadData}
       />
 

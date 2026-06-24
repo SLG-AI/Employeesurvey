@@ -10,6 +10,7 @@ type EmployeeRow = {
   employee_id: string;
   nom: string;
   email: string;
+  telephone: string;
   direction: string;
   departement: string;
   service: string;
@@ -86,6 +87,7 @@ function parseFile(buffer: ArrayBuffer, filename: string): ParsedData {
       headerMap["id_employe"] = h;
     else if (n.includes("nom") || n.includes("name")) headerMap["nom"] = h;
     else if (n.includes("email") || n.includes("mail")) headerMap["email"] = h;
+    else if (n.includes("telephone") || n.includes("phone") || n.includes("mobile") || n.includes("gsm") || n.includes("portable") || n === "tel") headerMap["telephone"] = h;
     else if (n.includes("direction")) headerMap["direction"] = h;
     else if (n.includes("departement") || n.includes("department"))
       headerMap["departement"] = h;
@@ -122,6 +124,7 @@ function parseFile(buffer: ArrayBuffer, filename: string): ParsedData {
     const employee_id = (row[headerMap["id_employe"]] || "").toString().trim();
     const nom = headerMap["nom"] ? (row[headerMap["nom"]] || "").toString().trim() : "";
     const email = headerMap["email"] ? (row[headerMap["email"]] || "").toString().trim().toLowerCase() : "";
+    const telephone = headerMap["telephone"] ? (row[headerMap["telephone"]] || "").toString().trim() : "";
     const direction = headerMap["direction"] ? (row[headerMap["direction"]] || "").toString().trim() : "";
     const departement = headerMap["departement"] ? (row[headerMap["departement"]] || "").toString().trim() : "";
     const service = headerMap["service"] ? (row[headerMap["service"]] || "").toString().trim() : "";
@@ -150,7 +153,7 @@ function parseFile(buffer: ArrayBuffer, filename: string): ParsedData {
     }
     seenEmails.add(employee_id);
 
-    employees.push({ employee_id, nom, email, direction, departement, service, sexe, date_naissance, date_entree, fonction, lieu_travail, type_contrat, temps_travail, cost_center });
+    employees.push({ employee_id, nom, email, telephone, direction, departement, service, sexe, date_naissance, date_entree, fonction, lieu_travail, type_contrat, temps_travail, cost_center });
   }
 
   const detectedDemographics = ["sexe", "date_naissance", "date_entree", "fonction", "lieu_travail", "type_contrat", "temps_travail", "cost_center"].filter(col => headerMap[col]);
@@ -425,6 +428,7 @@ export async function POST(request: Request) {
         .update({
           employee_name: emp.nom || null,
           email: emp.email || null,
+          phone: emp.telephone || null,
           societe_id: societeId,
           direction_id: dirId,
           department_id: deptId,
@@ -467,6 +471,7 @@ export async function POST(request: Request) {
         token,
         employee_id: emp.employee_id,
         email: emp.email || null,
+        phone: emp.telephone || null,
         employee_name: emp.nom || null,
         societe_id: societeId,
         direction_id: dirId,

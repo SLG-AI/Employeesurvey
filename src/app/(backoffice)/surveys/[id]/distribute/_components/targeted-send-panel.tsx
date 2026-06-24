@@ -27,6 +27,7 @@ import {
   Users,
   Mail,
   MessageSquare,
+  Smartphone,
   AlertTriangle,
   Target,
 } from "lucide-react";
@@ -35,13 +36,14 @@ import { ManualRecipientPicker } from "./manual-recipient-picker";
 
 type Mode = "non_responders" | "never_invited" | "manual" | "all";
 
-type Channel = "email" | "teams";
+type Channel = "email" | "teams" | "sms";
 
 type Recipient = {
   token_id: string;
   employee_name: string | null;
   email: string | null;
   has_teams: boolean;
+  has_phone: boolean;
   invitation_sent_at: string | null;
   reminder_sent_at: string | null;
   teams_invitation_sent_at: string | null;
@@ -50,7 +52,13 @@ type Recipient = {
 };
 
 type Preview = {
-  counts: { total: number; email: number; teams: number; neither: number };
+  counts: {
+    total: number;
+    email: number;
+    teams: number;
+    sms: number;
+    neither: number;
+  };
   recipients: Recipient[];
   truncated: boolean;
 };
@@ -59,6 +67,7 @@ type Props = {
   surveyId: string;
   surveyPublished: boolean;
   teamsConfigured: boolean;
+  smsConfigured: boolean;
   onSent: () => void | Promise<void>;
 };
 
@@ -85,6 +94,7 @@ export function TargetedSendPanel({
   surveyId,
   surveyPublished,
   teamsConfigured,
+  smsConfigured,
   onSent,
 }: Props) {
   const [mode, setMode] = useState<Mode>("non_responders");
@@ -100,7 +110,7 @@ export function TargetedSendPanel({
     async (signal?: AbortSignal) => {
       if (mode === "manual" && manualTokenIds.length === 0) {
         setPreview({
-          counts: { total: 0, email: 0, teams: 0, neither: 0 },
+          counts: { total: 0, email: 0, teams: 0, sms: 0, neither: 0 },
           recipients: [],
           truncated: false,
         });
@@ -162,17 +172,28 @@ export function TargetedSendPanel({
   const effectiveTeamsCount = channels.includes("teams")
     ? (preview?.counts.teams ?? 0)
     : 0;
-  const effectiveTotal = Math.max(effectiveEmailCount, effectiveTeamsCount);
+  const effectiveSmsCount = channels.includes("sms")
+    ? (preview?.counts.sms ?? 0)
+    : 0;
+  const effectiveTotal = Math.max(
+    effectiveEmailCount,
+    effectiveTeamsCount,
+    effectiveSmsCount
+  );
 
   const sendDisabled =
     !surveyPublished ||
     sending ||
     channels.length === 0 ||
     (preview?.counts.total ?? 0) === 0 ||
-    (channels.includes("email") && !effectiveEmailCount && !channels.includes("teams")) ||
+    (effectiveEmailCount === 0 &&
+      effectiveTeamsCount === 0 &&
+      effectiveSmsCount === 0) ||
     (mode === "manual" && manualTokenIds.length === 0);
 
-  const channelInvalid = channels.includes("teams") && !teamsConfigured;
+  const channelInvalid =
+    (channels.includes("teams") && !teamsConfigured) ||
+    (channels.includes("sms") && !smsConfigured);
 
   const doSend = useCallback(async () => {
     setSending(true);
@@ -197,6 +218,13 @@ export function TargetedSendPanel({
             m === "never_invited"
               ? `/api/surveys/${surveyId}/send-teams-invitations`
               : `/api/surveys/${surveyId}/send-teams-reminders`,
+          body: {
+            mode: m,
+            tokenIds: m === "manual" ? manualTokenIds : undefined,
+          },
+        }),
+        sms: (m) => ({
+          url: `/api/surveys/${surveyId}/send-sms`,
           body: {
             mode: m,
             tokenIds: m === "manual" ? manualTokenIds : undefined,
@@ -359,6 +387,22 @@ export function TargetedSendPanel({
                 <span className="text-xs text-muted-foreground">(non configuré)</span>
               )}
             </label>
+            <label
+              className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${
+                smsConfigured ? "cursor-pointer" : "cursor-not-allowed opacity-50"
+              }`}
+            >
+              <Checkbox
+                checked={channels.includes("sms")}
+                onCheckedChange={() => smsConfigured && toggleChannel("sms")}
+                disabled={!smsConfigured}
+              />
+              <Smartphone className="h-4 w-4" />
+              SMS
+              {!smsConfigured && (
+                <span className="text-xs text-muted-foreground">(non configuré)</span>
+              )}
+            </label>
           </div>
         </div>
 
@@ -391,6 +435,10 @@ export function TargetedSendPanel({
                   <MessageSquare className="mr-1 h-3 w-3" />
                   {effectiveTeamsCount} via Teams
                 </Badge>
+                <Badge variant={channels.includes("sms") ? "default" : "secondary"}>
+                  <Smartphone className="mr-1 h-3 w-3" />
+                  {effectiveSmsCount} via SMS
+                </Badge>
                 {preview.counts.neither > 0 && (
                   <Badge variant="outline" className="text-amber-700">
                     {preview.counts.neither} sans canal disponible
@@ -417,6 +465,11 @@ export function TargetedSendPanel({
                             Teams
                           </Badge>
                         )}
+                        {r.has_phone && (
+                          <Badge variant="outline" className="text-xs">
+                            SMS
+                          </Badge>
+                        )}
                         {r.responded && (
                           <Badge variant="outline" className="text-xs text-green-700">
                             A répondu
@@ -439,7 +492,9 @@ export function TargetedSendPanel({
         {channelInvalid && (
           <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-            Le canal Teams n&apos;est pas configuré sur cet environnement.
+            {channels.includes("teams") && !teamsConfigured
+              ? "Le canal Teams n'est pas configuré sur cet environnement."
+              : "Le canal SMS (Twilio) n'est pas configuré sur cet environnement."}
           </div>
         )}
 

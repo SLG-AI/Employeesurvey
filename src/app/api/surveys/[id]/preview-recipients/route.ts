@@ -6,6 +6,7 @@ import {
   selectRecipients,
   type SendMode,
 } from "@/lib/surveys/recipient-selector";
+import { normalizePhone } from "@/lib/sms/twilio";
 
 const DEFAULT_MAX_PREVIEW = 200;
 const ABSOLUTE_MAX = 5000;
@@ -82,11 +83,13 @@ export async function POST(
 
   const { tokens } = selection;
   const teamsInstalled = await markTeamsAvailability(admin, tokens);
+  const hasPhone = (t: (typeof tokens)[number]) => !!normalizePhone(t.phone);
 
   const emailCount = tokens.filter((t) => !!t.email).length;
   const teamsCount = tokens.filter((t) => teamsInstalled.has(t.id)).length;
+  const smsCount = tokens.filter(hasPhone).length;
   const neitherCount = tokens.filter(
-    (t) => !t.email && !teamsInstalled.has(t.id)
+    (t) => !t.email && !teamsInstalled.has(t.id) && !hasPhone(t)
   ).length;
 
   const recipients = tokens.slice(0, limit).map((t) => ({
@@ -94,10 +97,13 @@ export async function POST(
     employee_name: t.employee_name,
     email: t.email,
     has_teams: teamsInstalled.has(t.id),
+    has_phone: hasPhone(t),
     invitation_sent_at: t.invitation_sent_at,
     reminder_sent_at: t.reminder_sent_at,
     teams_invitation_sent_at: t.teams_invitation_sent_at,
     teams_reminder_sent_at: t.teams_reminder_sent_at,
+    phone_invitation_sent_at: t.phone_invitation_sent_at,
+    phone_reminder_sent_at: t.phone_reminder_sent_at,
     responded: t.responded,
   }));
 
@@ -106,6 +112,7 @@ export async function POST(
       total: tokens.length,
       email: emailCount,
       teams: teamsCount,
+      sms: smsCount,
       neither: neitherCount,
     },
     recipients,

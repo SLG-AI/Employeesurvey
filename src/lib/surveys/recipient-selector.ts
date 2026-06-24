@@ -6,12 +6,15 @@ export type RecipientToken = {
   id: string;
   token: string;
   email: string | null;
+  phone: string | null;
   employee_name: string | null;
   survey_token_id: string | null;
   invitation_sent_at: string | null;
   reminder_sent_at: string | null;
   teams_invitation_sent_at: string | null;
   teams_reminder_sent_at: string | null;
+  phone_invitation_sent_at: string | null;
+  phone_reminder_sent_at: string | null;
   responded: boolean;
 };
 
@@ -41,10 +44,13 @@ type SurveyTokenRow = {
   reminder_sent_at: string | null;
   teams_invitation_sent_at: string | null;
   teams_reminder_sent_at: string | null;
+  phone_invitation_sent_at: string | null;
+  phone_reminder_sent_at: string | null;
   anonymous_tokens: {
     id: string;
     token: string;
     email: string | null;
+    phone: string | null;
     employee_name: string | null;
     active: boolean;
   } | null;
@@ -54,11 +60,14 @@ type AnonTokenRow = {
   id: string;
   token: string;
   email: string | null;
+  phone: string | null;
   employee_name: string | null;
   invitation_sent_at: string | null;
   reminder_sent_at: string | null;
   teams_invitation_sent_at: string | null;
   teams_reminder_sent_at: string | null;
+  phone_invitation_sent_at: string | null;
+  phone_reminder_sent_at: string | null;
 };
 
 export async function selectRecipients(
@@ -102,7 +111,7 @@ export async function selectRecipients(
     let q = admin
       .from("survey_tokens")
       .select(
-        "token_id,invitation_sent_at,reminder_sent_at,teams_invitation_sent_at,teams_reminder_sent_at,anonymous_tokens!inner(id,token,email,employee_name,active)"
+        "token_id,invitation_sent_at,reminder_sent_at,teams_invitation_sent_at,teams_reminder_sent_at,phone_invitation_sent_at,phone_reminder_sent_at,anonymous_tokens!inner(id,token,email,phone,employee_name,active)"
       )
       .eq("survey_id", surveyId);
 
@@ -123,14 +132,17 @@ export async function selectRecipients(
       rows = rows.filter(
         (r) =>
           (r.invitation_sent_at !== null ||
-            r.teams_invitation_sent_at !== null) &&
+            r.teams_invitation_sent_at !== null ||
+            r.phone_invitation_sent_at !== null) &&
           r.anonymous_tokens &&
           !respondedIds.has(r.anonymous_tokens.id)
       );
     } else if (mode === "never_invited") {
       rows = rows.filter(
         (r) =>
-          r.invitation_sent_at === null && r.teams_invitation_sent_at === null
+          r.invitation_sent_at === null &&
+          r.teams_invitation_sent_at === null &&
+          r.phone_invitation_sent_at === null
       );
     }
 
@@ -142,12 +154,15 @@ export async function selectRecipients(
           id: at.id,
           token: at.token,
           email: at.email,
+          phone: at.phone,
           employee_name: at.employee_name,
           survey_token_id: r.token_id,
           invitation_sent_at: r.invitation_sent_at,
           reminder_sent_at: r.reminder_sent_at,
           teams_invitation_sent_at: r.teams_invitation_sent_at,
           teams_reminder_sent_at: r.teams_reminder_sent_at,
+          phone_invitation_sent_at: r.phone_invitation_sent_at,
+          phone_reminder_sent_at: r.phone_reminder_sent_at,
           responded: respondedIds.has(at.id),
         };
       });
@@ -159,7 +174,7 @@ export async function selectRecipients(
   let q = admin
     .from("anonymous_tokens")
     .select(
-      "id,token,email,employee_name,invitation_sent_at,reminder_sent_at,teams_invitation_sent_at,teams_reminder_sent_at"
+      "id,token,email,phone,employee_name,invitation_sent_at,reminder_sent_at,teams_invitation_sent_at,teams_reminder_sent_at,phone_invitation_sent_at,phone_reminder_sent_at"
     )
     .eq("active", true);
 
@@ -181,13 +196,17 @@ export async function selectRecipients(
   if (mode === "non_responders") {
     rows = rows.filter(
       (r) =>
-        (r.invitation_sent_at !== null || r.teams_invitation_sent_at !== null) &&
+        (r.invitation_sent_at !== null ||
+          r.teams_invitation_sent_at !== null ||
+          r.phone_invitation_sent_at !== null) &&
         !respondedIds.has(r.id)
     );
   } else if (mode === "never_invited") {
     rows = rows.filter(
       (r) =>
-        r.invitation_sent_at === null && r.teams_invitation_sent_at === null
+        r.invitation_sent_at === null &&
+        r.teams_invitation_sent_at === null &&
+        r.phone_invitation_sent_at === null
     );
   }
 
@@ -195,12 +214,15 @@ export async function selectRecipients(
     id: r.id,
     token: r.token,
     email: r.email,
+    phone: r.phone,
     employee_name: r.employee_name,
     survey_token_id: null,
     invitation_sent_at: r.invitation_sent_at,
     reminder_sent_at: r.reminder_sent_at,
     teams_invitation_sent_at: r.teams_invitation_sent_at,
     teams_reminder_sent_at: r.teams_reminder_sent_at,
+    phone_invitation_sent_at: r.phone_invitation_sent_at,
+    phone_reminder_sent_at: r.phone_reminder_sent_at,
     responded: respondedIds.has(r.id),
   }));
 
