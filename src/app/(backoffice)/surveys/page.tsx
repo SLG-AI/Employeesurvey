@@ -41,6 +41,15 @@ type CompletionData = {
   rate: number;
 };
 
+// A survey is "expired" when it is published with a passed closing date.
+function isSurveyExpired(survey: Survey): boolean {
+  return (
+    survey.status === "published" &&
+    !!survey.closes_at &&
+    new Date(survey.closes_at).getTime() <= Date.now()
+  );
+}
+
 const STATUS_LABELS: Record<string, string> = {
   draft: "En préparation",
   published: "Publié",
@@ -335,7 +344,10 @@ export default function SurveysPage() {
               </TableRow>
             ) : (
               filteredSurveys.map((survey) => (
-                <TableRow key={survey.id}>
+                <TableRow
+                  key={survey.id}
+                  className={isSurveyExpired(survey) ? "opacity-60" : ""}
+                >
                   <TableCell className="font-medium">
                     <Link href={`/surveys/${survey.id}/edit`} className="hover:underline">
                       {survey.title_fr}
