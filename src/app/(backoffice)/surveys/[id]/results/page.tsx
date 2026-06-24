@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -22,7 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BenchmarkTab } from "@/components/shared/benchmark-tab";
-import { ArrowLeft, Users, ShieldAlert, BarChart3 } from "lucide-react";
+import { ArrowLeft, Users, ShieldAlert, BarChart3, Download, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { getScaleLabels } from "@/lib/utils/languages";
 import type { ScaleVariant } from "@/lib/types";
@@ -115,6 +115,8 @@ export default function ResultsPage() {
 
   const [data, setData] = useState<ResultsData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
+  const printRef = useRef<HTMLDivElement>(null);
   const [societeId, setSocieteId] = useState<string>("");
   const [directionId, setDirectionId] = useState<string>("");
   const [departmentId, setDepartmentId] = useState<string>("");
@@ -187,6 +189,93 @@ export default function ResultsPage() {
       (o) => o.type === "service" && (!departmentId || o.parent_id === departmentId)
     ) || [];
 
+  const handleExportPdf = useCallback(async () => {
+    const node = printRef.current;
+    if (!node) return;
+
+    const blocks = Array.from(
+      node.querySelectorAll<HTMLElement>("[data-pdf-block]")
+    );
+    if (blocks.length === 0) {
+      toast.error("Affichez l'onglet Résultats avant d'exporter.");
+      return;
+    }
+
+    setExporting(true);
+    try {
+      const [{ jsPDF }, { default: html2canvas }] = await Promise.all([
+        import("jspdf"),
+        import("html2canvas-pro"),
+      ]);
+
+      // Let React re-render with the export overrides (e.g. expand scroll areas).
+      await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      const margin = 10;
+      const usableW = pageW - margin * 2;
+      let y = margin;
+
+      // Title block
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(16);
+      const title = data?.survey?.title_fr || "Résultats";
+      const titleLines = pdf.splitTextToSize(title, usableW) as string[];
+      pdf.text(titleLines, margin, y + 5);
+      y += 5 + titleLines.length * 7;
+
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(10);
+      pdf.setTextColor(110);
+      pdf.text(
+        `${data?.totalResponses || 0} réponse(s) · Exporté le ${new Date().toLocaleDateString("fr-FR")}`,
+        margin,
+        y
+      );
+      pdf.setTextColor(0);
+      y += 6;
+
+      for (const block of blocks) {
+        const canvas = await html2canvas(block, {
+          scale: 2,
+          backgroundColor: "#ffffff",
+          logging: false,
+        });
+        const imgData = canvas.toDataURL("image/png");
+        let drawW = usableW;
+        let drawH = (canvas.height * drawW) / canvas.width;
+
+        // A block taller than a full page is scaled down to fit one page.
+        if (drawH > pageH - margin * 2) {
+          drawH = pageH - margin * 2;
+          drawW = (canvas.width * drawH) / canvas.height;
+        }
+        // Start a new page when the block would overflow the current one.
+        if (y + drawH > pageH - margin) {
+          pdf.addPage();
+          y = margin;
+        }
+        pdf.addImage(imgData, "PNG", margin, y, drawW, drawH);
+        y += drawH + 4;
+      }
+
+      const slug = (data?.survey?.title_fr || "sondage")
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)/g, "");
+      pdf.save(`resultats-${slug || "sondage"}.pdf`);
+    } catch (err) {
+      console.error(err);
+      toast.error("Erreur lors de la génération du PDF");
+    } finally {
+      setExporting(false);
+    }
+  }, [data]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -210,10 +299,27 @@ export default function ResultsPage() {
             </p>
           </div>
         </div>
-        <Badge variant="outline" className="flex items-center gap-1">
-          <Users className="h-3 w-3" />
-          {data?.totalResponses || 0} réponse(s)
-        </Badge>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="flex items-center gap-1">
+            <Users className="h-3 w-3" />
+            {data?.totalResponses || 0} réponse(s)
+          </Badge>
+          {!data?.anonymityBlocked && (data?.questions?.length ?? 0) > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportPdf}
+              disabled={exporting}
+            >
+              {exporting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
+              <span className="ml-2">PDF</span>
+            </Button>
+          )}
+        </div>
       </div>
 
       <Tabs defaultValue="results" className="w-full">
@@ -549,6 +655,14 @@ export default function ResultsPage() {
       )}
 
       {/* Question results */}
+      <div
+        ref={printRef}
+        className={`space-y-6 ${
+          exporting
+            ? "[&_.pdf-scroll]:max-h-none [&_.pdf-scroll]:overflow-visible"
+            : ""
+        }`}
+      >
       {!data?.anonymityBlocked &&
         data?.questions.map((q, i) => {
           // Show section header when entering a new section
@@ -559,7 +673,7 @@ export default function ResultsPage() {
             : null;
 
           return (
-            <div key={q.id} className="space-y-4">
+            <div key={q.id} data-pdf-block className="space-y-4">
               {sectionTitle && (
                 <div className="rounded-lg border-l-4 border-primary bg-muted/50 px-4 py-3 mt-2">
                   <h3 className="font-semibold text-sm">{sectionTitle}</h3>
@@ -699,7 +813,7 @@ export default function ResultsPage() {
               })()}
 
               {q.type === "free_text" && q.responses && (
-                <div className="space-y-2 max-h-96 overflow-y-auto">
+                <div className="pdf-scroll space-y-2 max-h-96 overflow-y-auto">
                   {q.responses.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
                       Aucune réponse textuelle.
@@ -731,6 +845,7 @@ export default function ResultsPage() {
             </CardContent>
           </Card>
         )}
+      </div>
 
         </TabsContent>
 
