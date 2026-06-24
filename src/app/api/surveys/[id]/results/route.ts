@@ -265,7 +265,7 @@ export async function GET(
       });
 
       aggregation = {
-        type: "choices",
+        type: q.type,
         options: options.map((o) => ({
           id: o.id,
           text_fr: o.text_fr,
