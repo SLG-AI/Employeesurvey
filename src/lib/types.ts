@@ -8,6 +8,7 @@ export type Onboarding = {
   job_title: string;
   start_date: string | null;
   state: Record<string, unknown>;
+  content: Record<string, unknown>;
   created_by: string | null;
   created_at: string;
   updated_at: string;

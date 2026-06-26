@@ -3,6 +3,11 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { OnboardingGuide } from "./_components/onboarding-guide";
+import {
+  contentOrDefault,
+  type OnboardingContent,
+} from "@/lib/onboarding/content";
+import type { OnboardingState } from "@/lib/onboarding/schema";
 
 type LoadState =
   | { status: "loading" }
@@ -10,12 +15,8 @@ type LoadState =
   | { status: "error"; message: string }
   | {
       status: "ready";
-      initialState: {
-        lang: "fr" | "en";
-        checked: number[];
-        health: Record<string, number>;
-        rows: Record<string, string[][]>;
-      };
+      initialState: OnboardingState;
+      content: OnboardingContent;
     };
 
 export default function PublicOnboardingPage() {
@@ -42,16 +43,21 @@ export default function PublicOnboardingPage() {
         }
         const body = await res.json();
         const raw = body.onboarding?.state ?? {};
-        const initialState = {
+        const initialState: OnboardingState = {
           lang: raw.lang === "en" ? ("en" as const) : ("fr" as const),
-          checked: Array.isArray(raw.checked) ? raw.checked : [],
+          // Keep only string ids — drops any legacy numeric indices rather than
+          // mis-applying them against the new id-based model.
+          checked: Array.isArray(raw.checked)
+            ? raw.checked.filter((x: unknown) => typeof x === "string")
+            : [],
           health:
             raw.health && typeof raw.health === "object"
               ? { ...raw.health }
               : {},
           rows: raw.rows && typeof raw.rows === "object" ? { ...raw.rows } : {},
         };
-        setLoad({ status: "ready", initialState });
+        const content = contentOrDefault(body.onboarding?.content);
+        setLoad({ status: "ready", initialState, content });
       } catch (e) {
         if (!cancelled)
           setLoad({
@@ -87,5 +93,11 @@ export default function PublicOnboardingPage() {
     );
   }
 
-  return <OnboardingGuide slug={slug} initialState={load.initialState} />;
+  return (
+    <OnboardingGuide
+      slug={slug}
+      initialState={load.initialState}
+      content={load.content}
+    />
+  );
 }

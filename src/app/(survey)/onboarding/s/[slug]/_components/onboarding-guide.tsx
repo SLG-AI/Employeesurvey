@@ -1,29 +1,29 @@
 "use client";
 
-import { forwardRef, memo, useEffect, useRef, useState } from "react";
-import { GUIDE_HTML } from "./template";
+import { forwardRef, memo, useEffect, useMemo, useRef, useState } from "react";
+import { GUIDE_SHELL } from "./template";
+import {
+  buildGuideHtml,
+  type OnboardingContent,
+} from "@/lib/onboarding/content";
+import type { OnboardingState } from "@/lib/onboarding/schema";
 
-// Stable reference — must never be recreated, or React will re-apply innerHTML
-// and wipe the classList mutations (checked, selected, etc.) our event
-// delegation makes in place.
-const GUIDE_HTML_PROP = { __html: GUIDE_HTML } as const;
-
+// The __html object identity must stay stable across re-renders, or React will
+// re-apply innerHTML and wipe the classList mutations (checked, selected, etc.)
+// our event delegation makes in place. We memoize it from `content`, which is
+// fixed for the lifetime of the public guide.
 const TemplateHost = memo(
-  forwardRef<HTMLDivElement>(function TemplateHost(_props, ref) {
-    return <div ref={ref} dangerouslySetInnerHTML={GUIDE_HTML_PROP} />;
-  })
+  forwardRef<HTMLDivElement, { htmlProp: { __html: string } }>(
+    function TemplateHost({ htmlProp }, ref) {
+      return <div ref={ref} dangerouslySetInnerHTML={htmlProp} />;
+    }
+  )
 );
-
-type OnboardingState = {
-  lang: "fr" | "en";
-  checked: number[];
-  health: Record<string, number>;
-  rows: Record<string, string[][]>;
-};
 
 type Props = {
   slug: string;
   initialState: OnboardingState;
+  content: OnboardingContent;
 };
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
@@ -127,9 +127,12 @@ function readStateFromDom(
   root: HTMLElement,
   currentLang: "fr" | "en"
 ): OnboardingState {
-  const checked: number[] = [];
-  root.querySelectorAll(".check-item").forEach((el, i) => {
-    if (el.classList.contains("checked")) checked.push(i);
+  const checked: string[] = [];
+  root.querySelectorAll<HTMLElement>(".check-item").forEach((el) => {
+    if (el.classList.contains("checked")) {
+      const id = el.dataset.itemId;
+      if (id) checked.push(id);
+    }
   });
 
   const health: Record<string, number> = {};
@@ -183,10 +186,12 @@ function applyState(root: HTMLElement, state: OnboardingState) {
     });
   });
 
-  // Checked items
-  const items = root.querySelectorAll(".check-item");
-  (state.checked ?? []).forEach((i) => {
-    if (items[i]) items[i].classList.add("checked");
+  // Checked items — matched by stable id. Orphan ids (from deleted questions)
+  // simply match nothing, which is safe.
+  (state.checked ?? []).forEach((id) => {
+    root
+      .querySelector(`.check-item[data-item-id="${CSS.escape(id)}"]`)
+      ?.classList.add("checked");
   });
 
   // Health picks
@@ -208,9 +213,11 @@ function applyState(root: HTMLElement, state: OnboardingState) {
   updateAll(root, lang);
 }
 
-export function OnboardingGuide({ slug, initialState }: Props) {
+export function OnboardingGuide({ slug, initialState, content }: Props) {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const langRef = useRef<"fr" | "en">(initialState.lang ?? "fr");
+  const html = useMemo(() => buildGuideHtml(GUIDE_SHELL, content), [content]);
+  const htmlProp = useMemo(() => ({ __html: html }), [html]);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scheduleSaveRef = useRef<(() => void) | null>(null);
@@ -377,7 +384,7 @@ export function OnboardingGuide({ slug, initialState }: Props) {
               ? "Erreur"
               : ""}
       </div>
-      <TemplateHost ref={rootRef} />
+      <TemplateHost ref={rootRef} htmlProp={htmlProp} />
     </div>
   );
 }

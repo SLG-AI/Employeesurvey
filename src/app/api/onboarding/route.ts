@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createOnboardingSchema } from "@/lib/onboarding/schema";
 import { generateSlug } from "@/lib/onboarding/slug";
+import { DEFAULT_CONTENT } from "@/lib/onboarding/content";
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
@@ -40,7 +41,7 @@ export async function POST(req: NextRequest) {
 
   const initialState = {
     lang: "fr" as const,
-    checked: [] as number[],
+    checked: [] as string[],
     health: {} as Record<string, number>,
     rows: {} as Record<string, string[][]>,
   };
@@ -56,6 +57,7 @@ export async function POST(req: NextRequest) {
       job_title: parsed.data.job_title,
       start_date: parsed.data.start_date ?? null,
       state: initialState,
+      content: DEFAULT_CONTENT,
       created_by: user.id,
     })
     .select()
