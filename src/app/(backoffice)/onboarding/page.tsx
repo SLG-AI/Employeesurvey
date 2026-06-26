@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +33,7 @@ import {
   Loader2,
   MoreHorizontal,
   Plus,
+  Pencil,
   Archive,
   ArchiveRestore,
   Trash2,
@@ -44,6 +46,7 @@ type Filter = "active" | "archived" | "all";
 
 export default function OnboardingPage() {
   const supabase = createClient();
+  const router = useRouter();
   const [items, setItems] = useState<Onboarding[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<Filter>("active");
@@ -215,6 +218,15 @@ export default function OnboardingPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={() =>
+                              router.push(`/onboarding/${o.id}/edit`)
+                            }
+                          >
+                            <Pencil className="mr-2 h-4 w-4" />
+                            Modifier le questionnaire
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
                           {o.archived_at ? (
                             <DropdownMenuItem
                               onClick={() => setArchived(o.id, false)}

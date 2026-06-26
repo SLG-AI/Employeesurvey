@@ -12,7 +12,7 @@ export async function GET(
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("onboardings")
-    .select("id, first_name, last_name, job_title, start_date, state")
+    .select("id, first_name, last_name, job_title, start_date, state, content")
     .eq("slug", slug)
     .is("archived_at", null)
     .maybeSingle();
