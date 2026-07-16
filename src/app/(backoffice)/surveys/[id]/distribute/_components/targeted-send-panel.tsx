@@ -32,6 +32,7 @@ import {
   Target,
 } from "lucide-react";
 import { toast } from "sonner";
+import { pollTeamsJob } from "@/lib/teams/poll-client";
 import { ManualRecipientPicker } from "./manual-recipient-picker";
 
 type Mode = "non_responders" | "never_invited" | "manual" | "all";
@@ -251,19 +252,33 @@ export function TargetedSendPanel({
 
       for (let i = 0; i < results.length; i++) {
         const r = results[i];
+        const ch = channels[i];
         if (r.status === "rejected") {
-          errors.push(`Canal ${channels[i]} : erreur réseau`);
+          errors.push(`Canal ${ch} : erreur réseau`);
           continue;
         }
         if (!r.value.ok) {
           const data = await r.value.json().catch(() => ({}));
-          errors.push(`Canal ${channels[i]} : ${data.error ?? r.value.status}`);
+          errors.push(`Canal ${ch} : ${data.error ?? r.value.status}`);
           continue;
         }
         const data = await r.value.json();
-        sent += data.sent ?? 0;
-        failed += data.failed ?? 0;
-        notInstalled += data.notInstalled ?? 0;
+        // Teams sends run as a background job; poll it to completion.
+        if (ch === "teams" && data.jobId) {
+          const final = await pollTeamsJob(surveyId, data.jobId);
+          sent += final.sent;
+          failed += final.failed;
+          notInstalled += final.notInstalled;
+          if (final.status === "error") {
+            errors.push(`Canal teams : ${final.errorMessage ?? "erreur"}`);
+          } else if (final.status === "timeout") {
+            errors.push("Canal teams : envoi toujours en cours en arrière-plan");
+          }
+        } else {
+          sent += data.sent ?? 0;
+          failed += data.failed ?? 0;
+          notInstalled += data.notInstalled ?? 0;
+        }
       }
 
       if (sent > 0) {
