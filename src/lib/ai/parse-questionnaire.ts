@@ -83,7 +83,9 @@ export async function parseQuestionnaire(
 
   const message = await client.messages.create({
     model: "claude-sonnet-4-6",
-    max_tokens: 4096,
+    // Un questionnaire complet peut produire un JSON volumineux ; 4096 tokens
+    // tronquait la réponse en pleine chaîne ("Unterminated string in JSON").
+    max_tokens: 16000,
     system: SYSTEM_PROMPT,
     messages: [
       {
@@ -92,6 +94,14 @@ export async function parseQuestionnaire(
       },
     ],
   });
+
+  // Si la réponse est coupée par la limite de tokens, le JSON est incomplet :
+  // on renvoie une erreur explicite plutôt qu'un « Unterminated string ».
+  if (message.stop_reason === "max_tokens") {
+    throw new Error(
+      "Le questionnaire est trop long pour être analysé en une seule fois. Découpez le document en plusieurs parties et réessayez."
+    );
+  }
 
   const responseText =
     message.content[0].type === "text" ? message.content[0].text : "";
